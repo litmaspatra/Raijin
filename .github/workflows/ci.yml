@@ -25,6 +25,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Restore Gradle dependency cache
+        # Cache-hit runs download little from Maven Central (the only throttled
+        # host; all observed 429s were repo.maven.apache.org). Cache miss = a
+        # normal cold-download run. Only dependency artifacts and runtimes are
+        # cached - never ~/.gradle/gradle.properties, credentials or init
+        # scripts. PR runs restore default-branch caches but their saves are
+        # merge-ref scoped by GitHub; the explicit save below is push-only.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/jars-9
+            ~/.gradle/wrapper/dists
+            ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: gradle-${{ runner.os }}-jdk17-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-jdk17-
+
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - name: Ensure Gradle 8.10.2 wrapper cached
@@ -98,6 +116,24 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Restore Gradle dependency cache
+        # Cache-hit runs download little from Maven Central (the only throttled
+        # host; all observed 429s were repo.maven.apache.org). Cache miss = a
+        # normal cold-download run. Only dependency artifacts and runtimes are
+        # cached - never ~/.gradle/gradle.properties, credentials or init
+        # scripts. PR runs restore default-branch caches but their saves are
+        # merge-ref scoped by GitHub; the explicit save below is push-only.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/jars-9
+            ~/.gradle/wrapper/dists
+            ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: gradle-${{ runner.os }}-jdk17-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-jdk17-
+
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
       - name: Ensure Gradle 8.10.2 wrapper cached
@@ -128,6 +164,7 @@ jobs:
           fc-list 2>/dev/null | wc -l
           fc-list 2>/dev/null | grep -ciE 'devanagari|noto' || true
       - name: Assemble debug APK
+        id: assemble
         run: |
           set -o pipefail
           ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee /tmp/gradle-build.log || {
@@ -164,6 +201,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Pre-fetch Robolectric android-all runtimes
+        # Runs after an earlier failure (e.g. expected-red Paparazzi) so unit-test
+        # evidence is never skipped downstream of a known red, but a user or
+        # concurrency cancellation still stops the job.
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           # Robolectric downloads its instrumented Android runtimes at test
@@ -179,15 +220,51 @@ jobs:
             done
           done
       - name: Run unit tests
+        if: ${{ !cancelled() }}
         run: |
           set -o pipefail
           ./gradlew --no-daemon :app:testDebugUnitTest 2>&1 | tee /tmp/gradle-test.log || {
             echo "::error::$(base64 -w0 /tmp/gradle-test.log)"
             exit 1
           }
+      - name: Summarize unit test results (XML counts)
+        # Test evidence is XML counts, not task success alone: a task that ran
+        # zero tests is a broken signal, not a green one. Paparazzi classes run
+        # here render without comparing (real verification is verifyPaparazziDebug).
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          tests=fails=errs=skip=0
+          files=glob.glob('app/build/test-results/testDebugUnitTest/*.xml')
+          for f in files:
+              r=ET.parse(f).getroot()
+              tests+=int(r.get('tests',0)); fails+=int(r.get('failures',0))
+              errs+=int(r.get('errors',0)); skip+=int(r.get('skipped',0))
+          print(f"unit-test XML: files={len(files)} tests={tests} failures={fails} errors={errs} skipped={skip}")
+          if tests==0:
+              print("::error::zero unit tests recorded in XML - treating as broken signal")
+              sys.exit(1)
+          PY
+      - name: Save Gradle dependency cache
+        # Explicit save: the combined cache action only saves on job success,
+        # which the expected-red Paparazzi step would otherwise prevent
+        # forever. Runs only when dependency resolution actually succeeded
+        # (assemble green), on push events (never PR contexts), and never on
+        # cancellation. Save is a no-op warning if the exact key already exists.
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && steps.assemble.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/jars-9
+            ~/.gradle/wrapper/dists
+            ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: gradle-${{ runner.os }}-jdk17-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+
       - name: Capture CI renders (diagnostic only, no commit, restores goldens)
         id: capture-renders
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           # Fail-closed: a failed record is a failed step, never masked.
