@@ -290,20 +290,11 @@ class PermissionBroker(private val context: Context) {
      * Brain must always call this — never hard-delete.
      */
     fun softDelete(file: File): File? {
-        return try {
-            val recoveryDir = File(file.parentFile, RECOVERY_DIR).also { it.mkdirs() }
-            val dest = File(recoveryDir, "${file.name}.${System.currentTimeMillis()}")
-            if (file.renameTo(dest)) {
-                Log.d(TAG, "Soft-deleted ${file.name} → ${dest.path}")
-                dest
-            } else {
-                Log.e(TAG, "Failed to soft-delete ${file.name}")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "softDelete error: ${e.message}")
-            null
-        }
+        // Deepest execution boundary: file deletion is disabled this release
+        // (PRD ST-6 24-hour trash lands with the storage workstream). No
+        // caller can move user files through the broker until then.
+        Log.w(TAG, "softDelete disabled in this release; refusing ${file.name}")
+        return null
     }
 
     /**

@@ -633,13 +633,7 @@ class RaijinService : Service() {
                 val triggerPhrase = skillCreateMatch.groupValues[2].trim()
                 val actionDesc = skillCreateMatch.groupValues[3].trim().lowercase()
 
-                val actionType = when {
-                    actionDesc.contains("clean") || actionDesc.contains("storage") || actionDesc.contains("junk") -> "DELETE_FILES"
-                    actionDesc.contains("pause") || actionDesc.contains("mute") || actionDesc.contains("music") || actionDesc.contains("silence") -> "MUSIC_CONTROL"
-                    actionDesc.contains("call") -> "CALL_CONTACT"
-                    actionDesc.contains("reminder") || actionDesc.contains("remind") -> "CREATE_REMINDER"
-                    else -> null
-                }
+                val actionType = com.raijin.app.skill.SkillActionMapper.forDescription(actionDesc)
 
                 // PRD 2.2.1: fail closed. An unrecognised action description must
                 // never fall back to a destructive action like DELETE_FILES.

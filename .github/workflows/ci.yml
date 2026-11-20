@@ -186,21 +186,31 @@ jobs:
             exit 1
           }
       - name: Capture CI renders (diagnostic only, no commit, restores goldens)
+        id: capture-renders
         if: always()
         run: |
-          set -e
-          ./gradlew --no-daemon :app:recordPaparazziDebug --tests "com.raijin.app.PreferencesPaparazziTest" || true
+          set -euo pipefail
+          # Fail-closed: a failed record is a failed step, never masked.
+          ./gradlew --no-daemon :app:recordPaparazziDebug --tests "com.raijin.app.PreferencesPaparazziTest"
+          # Provenance: record succeeded (set -e above) => snapshot files ARE the
+          # actual renders, whether or not they differ from committed goldens.
+          # Copy them out BEFORE restoring, then restore so later steps see the
+          # committed goldens again.
           mkdir -p /tmp/ci-renders
-          cp app/src/test/snapshots/images/com.raijin.app_PreferencesPaparazziTest_*.png /tmp/ci-renders/ 2>/dev/null || true
-          git checkout -- app/src/test/snapshots/images/ || true
+          cp app/src/test/snapshots/images/com.raijin.app_PreferencesPaparazziTest_*.png /tmp/ci-renders/
+          git checkout -- app/src/test/snapshots/images/
+          {
+            echo "run_id=$GITHUB_RUN_ID attempt=$GITHUB_RUN_ATTEMPT sha=$GITHUB_SHA"
+            echo "captured_at=$(date -u +%FT%TZ)"
+          } > /tmp/ci-renders/PROVENANCE.txt
           cd /tmp/ci-renders && for f in *.png; do
-            python3 -c "import struct,sys; d=open('$f','rb').read(33); w,h=struct.unpack('>II', d[16:24]); print(f'$f {w}x{h}')"
+            python3 -c "import struct,hashlib; b=open('$f','rb').read(); w,h=struct.unpack('>II', b[16:24]); print(f'$f {w}x{h} sha256={hashlib.sha256(b).hexdigest()[:16]}')" | tee -a PROVENANCE.txt
           done
       - name: Upload CI preference renders (diagnostic)
-        if: always()
+        if: always() && steps.capture-renders.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: ci-preferences-renders
           path: /tmp/ci-renders/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14

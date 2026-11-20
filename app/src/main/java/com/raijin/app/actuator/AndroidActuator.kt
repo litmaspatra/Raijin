@@ -105,7 +105,11 @@ class AndroidActuator(
                 ActionType.DISMISS_ALARM -> executeDismissAlarm(action)
                 ActionType.MUSIC_CONTROL -> executeMusicControl(action)
                 ActionType.MUSIC_FEEDBACK -> executeMusicFeedback(action)
-                ActionType.DELETE_FILES,
+                // Disabled this release: file deletion is out of release
+                // scope (PRD ST-x is future work). Fails closed with an
+                // unsupported message; no deletion path is reached.
+                ActionType.DELETE_FILES ->
+                    ActionResult.FAILED("Unsupported action in this release: file deletion is disabled")
                 ActionType.FIND_FILE,
                 ActionType.ORGANIZE_FILES -> executeStorageManagement(action)
                 ActionType.SHARE_FILE,
@@ -817,17 +821,10 @@ class AndroidActuator(
     private fun executeStorageManagement(action: DispatchResult): ActionResult {
         val fileTargets = action.targets.filterIsInstance<ActionTarget.File>()
         if (fileTargets.isNotEmpty()) {
-            for (fileTarget in fileTargets) {
-                val file = File(fileTarget.ref)
-                // ME-5: owner-protected paths are never deleted, whatever asked.
-                if (com.raijin.app.prefs.UserPreferencesStore(context).isProtectedPath(file.absolutePath)) {
-                    return ActionResult.DENIED("Protected by owner preferences: ${fileTarget.ref}")
-                }
-                if (file.exists()) {
-                    permissionBroker.softDelete(file)
-                }
-            }
-            return ActionResult.EXECUTED()
+            // Execution boundary: user-file deletion is disabled this release,
+            // for EVERY action type routed here (FIND_FILE/ORGANIZE_FILES
+            // included - a find must never delete). Restore with PRD ST-6.
+            return ActionResult.FAILED("File deletion is disabled in this release")
         }
 
         // Ambient approved junk & cache cleaning via StorageAuditor

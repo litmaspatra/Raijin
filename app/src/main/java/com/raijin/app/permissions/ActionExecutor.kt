@@ -71,7 +71,11 @@ class ActionExecutor(
         Log.d(TAG, "Executing action: $type with params: $params")
         val result = when (type) {
             "call"              -> executeCall(params)
-            "soft_delete"       -> executeSoftDelete(params)
+            // Recognised but disabled this release: storage cleaning is out of
+            // release scope (PRD ST-x is future work). Kept as an explicit
+            // branch so aliases/LLM output fail safely instead of falling
+            // through to "unknown".
+            "soft_delete"       -> Result.Failure("Unsupported in this release: soft_delete (file deletion disabled)")
             "open_file"         -> executeOpenFile(params)
             "share_file"        -> executeShareFile(params)
             "whatsapp_message"  -> executeWhatsAppMessage(params)
@@ -153,48 +157,14 @@ class ActionExecutor(
     // =========================================================================
 
     /**
-     * Moves a file to Raijin's trash folder (24-hour recovery window) rather than
-     * permanently deleting it.
-     *
-     * Required params:
-     * - `file_path` — Absolute path of the file to delete.
+     * DISABLED this release: file deletion is out of release scope (PRD ST-6
+     * 24-hour trash lands with the storage workstream). Always denied.
      */
     private suspend fun executeSoftDelete(params: Map<String, String>): Result {
-        val filePath = params["file_path"]?.takeIf { it.isNotBlank() }
-            ?: return Result.Failure("Missing param: file_path")
-
-        // ME-5: owner-protected paths are never deleted, whatever asked.
-        if (com.raijin.app.prefs.UserPreferencesStore(context).isProtectedPath(filePath)) {
-            return Result.Denied("Protected by owner preferences: $filePath")
-        }
-
-        val hasPermission = permissionBroker.ensureStoragePermission()
-        if (!hasPermission) {
-            return Result.Denied("Storage permission not granted.")
-        }
-
-        return withContext(Dispatchers.IO) {
-            try {
-                val source = java.io.File(filePath)
-                if (!source.exists()) {
-                    return@withContext Result.Failure("File not found: $filePath")
-                }
-
-                val trashDir = java.io.File(context.filesDir, "raijin_trash").apply { mkdirs() }
-                val destination = java.io.File(trashDir, "${System.currentTimeMillis()}_${source.name}")
-
-                val moved = source.renameTo(destination)
-                if (moved) {
-                    Log.i(TAG, "Soft-deleted: $filePath → $destination")
-                    Result.Success("Moved to trash. Recoverable for 24 hours.")
-                } else {
-                    Result.Failure("Could not move file to trash: $filePath")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Soft delete failed", e)
-                Result.Failure("Delete failed: ${e.message}")
-            }
-        }
+        // Execution boundary: file deletion is disabled this release (PRD ST-6
+        // 24-hour trash lands with the storage workstream). No caller, alias
+        // or LLM-produced parameter set reaches user files through here.
+        return Result.Denied("File deletion is disabled in this release.")
     }
 
     // =========================================================================

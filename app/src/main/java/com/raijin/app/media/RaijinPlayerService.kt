@@ -100,7 +100,19 @@ class RaijinPlayerService : MediaSessionService() {
             }
         })
         player = p
-        mediaSession = MediaSession.Builder(this, p).build()
+        mediaSession = MediaSession.Builder(this, p)
+            .setCallback(object : MediaSession.Callback {
+                // Per-controller access policy: trusted system controllers keep
+                // full access; arbitrary apps get transport-only commands so
+                // they cannot read the queue/timeline (track metadata and local
+                // URIs) or rewrite the queue. See SessionTrustPolicy.
+                override fun onConnect(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                ): MediaSession.ConnectionResult =
+                    SessionTrustPolicy.connectionResultFor(session, controller.isTrusted)
+            })
+            .build()
     }
 
     private fun recordEnd(id: String, positionMs: Long) {
