@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
  * Start with [playTrack]; the service foregrounds itself when playback
  * starts and stops itself when the queue ends and nothing is playing.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class RaijinPlayerService : MediaSessionService() {
 
     private var player: ExoPlayer? = null

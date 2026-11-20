@@ -11,9 +11,9 @@ import org.junit.Test
 class PreferencesPaparazziTest {
 
     // Frame tall enough for the full card incl. Protected paths + Provider order
-    // (1400 clipped the lower sections; 2400 leaves headroom, image bottom is empty background).
+    // (2400 still clipped the final row padding; 2600 leaves headroom, image bottom is empty background).
     @get:Rule
-    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2400))
+    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2600))
 
     @Test
     fun preferencesCardQuietHoursOff() {

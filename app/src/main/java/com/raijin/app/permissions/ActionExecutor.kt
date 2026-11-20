@@ -110,6 +110,9 @@ class ActionExecutor(
      * - `phone_number` — E.164 or local number string.
      * - `contact_name` — Display name for logging / TTS announcement (optional).
      */
+    // CALL_PHONE is verified by permissionBroker.ensureCallPermission() just below;
+    // lint cannot see through the broker indirection.
+    @android.annotation.SuppressLint("MissingPermission")
     private suspend fun executeCall(params: Map<String, String>): Result {
         val number = params["phone_number"]?.takeIf { it.isNotBlank() }
             ?: return Result.Failure("Missing param: phone_number")
