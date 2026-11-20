@@ -1,0 +1,11 @@
+[
+  {
+    "state": "morning_brief",
+    "traceId": "demo-mb",
+    "lines": [
+      "Line one",
+      "Line two",
+      "Line three"
+    ]
+  }
+]

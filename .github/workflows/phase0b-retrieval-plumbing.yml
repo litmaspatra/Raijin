@@ -1,0 +1,56 @@
+name: Phase 0B Retrieval Plumbing
+
+on:
+  push:
+    paths:
+      - ".github/workflows/phase0b-retrieval-plumbing.yml"
+      - "benchmarks/phase0b/retrieval.py"
+      - "benchmarks/phase0b/smoke_retrieval.py"
+      - "benchmarks/phase0b/tests/test_retrieval.py"
+      - "benchmarks/phase0b/pins.py"
+      - "benchmarks/phase0b/manifest.example.json"
+      - "benchmarks/phase0b/pilot/tasks.json"
+      - "benchmarks/phase0b/corpus/corpus.jsonl"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plumbing:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned retrieval dependencies
+        run: python -m pip install --disable-pip-version-check -r benchmarks/phase0b/requirements-runner.txt
+      - name: Download pinned MiniLM ONNX and tokenizers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/phase0b-models"
+          MINILM="$RUNNER_TEMP/phase0b-models/minilm.onnx"
+          MINILM_TOKENIZER="$RUNNER_TEMP/phase0b-models/minilm-tokenizer.json"
+          QWEN_TOKENIZER="$RUNNER_TEMP/phase0b-models/qwen-tokenizer.json"
+          curl -L --fail --retry 3 -o "$MINILM" \
+            "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/10dbd2f06a8baf40ad285b037edda610c1b9a57c/onnx/model.onnx"
+          echo "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452  $MINILM" | sha256sum -c -
+          curl -L --fail --retry 3 -o "$MINILM_TOKENIZER" \
+            "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/10dbd2f06a8baf40ad285b037edda610c1b9a57c/tokenizer.json"
+          echo "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037  $MINILM_TOKENIZER" | sha256sum -c -
+          curl -L --fail --retry 3 -o "$QWEN_TOKENIZER" \
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B/resolve/8123ea2e9354afb7ffcc6c8641d1b2f5ecf18301/tokenizer.json"
+          echo "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539  $QWEN_TOKENIZER" | sha256sum -c -
+          echo "MINILM=$MINILM" >> "$GITHUB_ENV"
+          echo "MINILM_TOKENIZER=$MINILM_TOKENIZER" >> "$GITHUB_ENV"
+          echo "QWEN_TOKENIZER=$QWEN_TOKENIZER" >> "$GITHUB_ENV"
+      - name: Run pilot-only retrieval plumbing
+        run: |
+          python benchmarks/phase0b/smoke_retrieval.py \
+            --corpus benchmarks/phase0b/corpus/corpus.jsonl \
+            --pilot benchmarks/phase0b/pilot/tasks.json \
+            --minilm-model "$MINILM" \
+            --minilm-tokenizer "$MINILM_TOKENIZER" \
+            --context-tokenizer "$QWEN_TOKENIZER"

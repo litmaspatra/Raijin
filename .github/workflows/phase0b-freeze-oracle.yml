@@ -1,0 +1,68 @@
+name: Phase 0B Freeze Oracle Mapping
+
+on:
+  push:
+    paths:
+      - ".github/workflows/phase0b-freeze-oracle.yml"
+      - "benchmarks/phase0b/oracle_mapping.jsonl"
+      - "benchmarks/phase0b/heldout/heldout_tasks.jsonl"
+      - "benchmarks/phase0b/corpus/corpus.jsonl"
+      - "benchmarks/phase0b/validate_oracle_mapping.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate heldout, corpus and oracle mapping before freeze
+        run: |
+          python benchmarks/phase0b/validate_oracle_mapping.py \
+            --tasks benchmarks/phase0b/heldout/heldout_tasks.jsonl \
+            --corpus benchmarks/phase0b/corpus/corpus.jsonl \
+            --mapping benchmarks/phase0b/oracle_mapping.jsonl \
+            --manifest benchmarks/phase0b/manifest.example.json
+      - name: Record oracle mapping SHA-256 in manifest
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          mapping = Path("benchmarks/phase0b/oracle_mapping.jsonl")
+          manifest = Path("benchmarks/phase0b/manifest.example.json")
+          digest = hashlib.sha256(mapping.read_bytes()).hexdigest()
+
+          data = json.loads(manifest.read_text(encoding="utf-8"))
+          data["oracle_mapping_sha256"] = digest
+          manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          print(f"ORACLE_MAPPING_SHA256={digest}")
+          PY
+      - name: Validate frozen hash
+        run: |
+          python benchmarks/phase0b/validate_oracle_mapping.py \
+            --tasks benchmarks/phase0b/heldout/heldout_tasks.jsonl \
+            --corpus benchmarks/phase0b/corpus/corpus.jsonl \
+            --mapping benchmarks/phase0b/oracle_mapping.jsonl \
+            --manifest benchmarks/phase0b/manifest.example.json \
+            --require-manifest-hash
+      - name: Commit frozen oracle mapping hash
+        shell: bash
+        run: |
+          if git diff --quiet -- benchmarks/phase0b/manifest.example.json; then
+            echo "Manifest already has the frozen oracle mapping hash."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add benchmarks/phase0b/manifest.example.json
+          git commit -m "phase 0B oracle: freeze mapping hash"
+          git push

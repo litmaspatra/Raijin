@@ -1,0 +1,172 @@
+name: Phase 0B Benchmark Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run only the 5 pilot tasks through the real runner"
+        required: true
+        default: true
+        type: boolean
+      include_1_5b:
+        description: "Run optional Qwen2.5-Coder-1.5B raw reference after A-E"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Select task set and output directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "TASKS_PATH=benchmarks/phase0b/pilot/tasks.json" >> "$GITHUB_ENV"
+            echo "OUT_DIR=phase0b-dry-run-logs" >> "$GITHUB_ENV"
+          else
+            echo "TASKS_PATH=benchmarks/phase0b/heldout/heldout_tasks.jsonl" >> "$GITHUB_ENV"
+            echo "OUT_DIR=phase0b-run-logs" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install pinned Python retrieval dependencies
+        run: python -m pip install --disable-pip-version-check -r benchmarks/phase0b/requirements-runner.txt
+
+      - name: Verify Docker and pull pinned candidate sandbox
+        run: |
+          docker version
+          docker pull python:3.12-slim@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f
+
+      - name: Install pinned llama.cpp b11436
+        shell: bash
+        run: |
+          set -euo pipefail
+          LLAMA_TAG="b11436"
+          LLAMA_ASSET="llama-b11436-bin-ubuntu-x64.tar.gz"
+          LLAMA_SHA256="2fb4070732a94cd627d83af65bca72be6af7498ede330ec650a7c55ba7f7c1c2"
+          ARCHIVE="$RUNNER_TEMP/$LLAMA_ASSET"
+          DIR="$RUNNER_TEMP/llama-cpp"
+          curl -L --fail --retry 3 -o "$ARCHIVE" \
+            "https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/$LLAMA_ASSET"
+          echo "$LLAMA_SHA256  $ARCHIVE" | sha256sum -c -
+          mkdir -p "$DIR"
+          tar -xzf "$ARCHIVE" -C "$DIR"
+          LLAMA_BIN="$(find "$DIR" -type f -name llama-completion -perm -111 | head -n 1)"
+          echo "LLAMA_BIN=$LLAMA_BIN" >> "$GITHUB_ENV"
+
+      - name: Download and verify pinned retrieval/model assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR="$RUNNER_TEMP/phase0b-models"
+          mkdir -p "$DIR"
+          MINILM="$DIR/minilm.onnx"
+          MINILM_TOKENIZER="$DIR/minilm-tokenizer.json"
+          QWEN_TOKENIZER="$DIR/qwen-tokenizer.json"
+          MODEL_05="$DIR/Qwen2.5-Coder-0.5B.Q4_K_M.gguf"
+
+          curl -L --fail --retry 3 -o "$MINILM" \
+            "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/10dbd2f06a8baf40ad285b037edda610c1b9a57c/onnx/model.onnx"
+          echo "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452  $MINILM" | sha256sum -c -
+
+          curl -L --fail --retry 3 -o "$MINILM_TOKENIZER" \
+            "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/10dbd2f06a8baf40ad285b037edda610c1b9a57c/tokenizer.json"
+          echo "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037  $MINILM_TOKENIZER" | sha256sum -c -
+
+          curl -L --fail --retry 3 -o "$QWEN_TOKENIZER" \
+            "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B/resolve/8123ea2e9354afb7ffcc6c8641d1b2f5ecf18301/tokenizer.json"
+          echo "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539  $QWEN_TOKENIZER" | sha256sum -c -
+
+          curl -L --fail --retry 3 -o "$MODEL_05" \
+            "https://huggingface.co/mradermacher/Qwen2.5-Coder-0.5B-GGUF/resolve/main/Qwen2.5-Coder-0.5B.Q4_K_M.gguf"
+          echo "8d548c47eb7eeb3b0dbfe0f7110226c075dd0ab797d714a72fe9bf54c4a336e5  $MODEL_05" | sha256sum -c -
+
+          echo "MINILM=$MINILM" >> "$GITHUB_ENV"
+          echo "MINILM_TOKENIZER=$MINILM_TOKENIZER" >> "$GITHUB_ENV"
+          echo "QWEN_TOKENIZER=$QWEN_TOKENIZER" >> "$GITHUB_ENV"
+          echo "MODEL_05=$MODEL_05" >> "$GITHUB_ENV"
+
+          if [ "$DRY_RUN" != "true" ] && [ "${{ inputs.include_1_5b }}" = "true" ]; then
+            MODEL_15="$DIR/Qwen2.5-Coder-1.5B.Q4_K_M.gguf"
+            curl -L --fail --retry 3 -o "$MODEL_15" \
+              "https://huggingface.co/QuantFactory/Qwen2.5-Coder-1.5B-GGUF/resolve/4a3ad87f47738fded697ed0a76bcce95208a2f68/Qwen2.5-Coder-1.5B.Q4_K_M.gguf"
+            echo "a9ccb6be802412e61e1acbee6287a23b11e56e94718560f910075c64b6194910  $MODEL_15" | sha256sum -c -
+            echo "MODEL_15=$MODEL_15" >> "$GITHUB_ENV"
+          fi
+
+      - name: Log CPU and llama.cpp version
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT_DIR"
+          {
+            echo "=== lscpu ==="
+            lscpu
+            echo
+            echo "=== llama.cpp version ==="
+            "$LLAMA_BIN" --version
+          } | tee "$OUT_DIR/environment.txt"
+
+      - name: Run all preregistered conditions sequentially
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(
+            --tasks "$TASKS_PATH"
+            --corpus benchmarks/phase0b/corpus/corpus.jsonl
+            --oracle benchmarks/phase0b/oracle_mapping.jsonl
+            --manifest benchmarks/phase0b/manifest.example.json
+            --prompt-template benchmarks/phase0b/prompt_template.txt
+            --llama-bin "$LLAMA_BIN"
+            --model-0_5b "$MODEL_05"
+            --minilm-model "$MINILM"
+            --minilm-tokenizer "$MINILM_TOKENIZER"
+            --context-tokenizer "$QWEN_TOKENIZER"
+            --output-dir "$OUT_DIR"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS+=(--dry-run)
+          elif [ "${{ inputs.include_1_5b }}" = "true" ]; then
+            ARGS+=(--model-1_5b "$MODEL_15")
+          fi
+          python benchmarks/phase0b/run_benchmark.py "${ARGS[@]}"
+
+      - name: Analyze official run with frozen gate
+        if: ${{ !inputs.dry_run }}
+        run: |
+          python benchmarks/phase0b/analyze_results.py \
+            --logs "$OUT_DIR" \
+            --tasks benchmarks/phase0b/heldout/heldout_tasks.jsonl \
+            --oracle benchmarks/phase0b/oracle_mapping.jsonl \
+            --manifest benchmarks/phase0b/manifest.example.json \
+            --output "$OUT_DIR/analysis.json"
+
+      - name: Upload dry-run logs
+        if: ${{ always() && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0b-dry-run-logs
+          path: phase0b-dry-run-logs/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload official benchmark logs
+        if: ${{ always() && !inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0b-benchmark-logs
+          path: phase0b-run-logs/
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,72 @@
+name: Phase 0B Freeze Corpus
+
+on:
+  push:
+    paths:
+      - ".github/workflows/phase0b-freeze-corpus.yml"
+      - "benchmarks/phase0b/corpus/corpus.jsonl"
+      - "benchmarks/phase0b/corpus/validate_corpus.py"
+      - "benchmarks/phase0b/corpus/verify_corpus.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Docker
+        run: docker version
+      - name: Pull corpus sandbox image
+        run: docker pull python:3.12-slim@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f
+      - name: Execute every verified corpus item in Docker
+        run: |
+          python benchmarks/phase0b/corpus/verify_corpus.py \
+            benchmarks/phase0b/corpus/corpus.jsonl \
+            benchmarks/phase0b/corpus/verification-results.jsonl
+      - name: Validate corpus and verification record
+        run: |
+          python benchmarks/phase0b/corpus/validate_corpus.py \
+            benchmarks/phase0b/corpus/corpus.jsonl \
+            benchmarks/phase0b/corpus/verification-results.jsonl
+      - name: Record corpus SHA-256 in manifest
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          corpus = Path("benchmarks/phase0b/corpus/corpus.jsonl")
+          manifest = Path("benchmarks/phase0b/manifest.example.json")
+          digest = hashlib.sha256(corpus.read_bytes()).hexdigest()
+          data = json.loads(manifest.read_text(encoding="utf-8"))
+          data["corpus_sha256"] = digest
+          manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          print(f"CORPUS_SHA256={digest}")
+          PY
+      - name: Upload execution record
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0b-frozen-corpus-verification
+          path: benchmarks/phase0b/corpus/verification-results.jsonl
+          if-no-files-found: error
+          retention-days: 90
+      - name: Commit frozen corpus hash
+        shell: bash
+        run: |
+          if git diff --quiet -- benchmarks/phase0b/manifest.example.json; then
+            echo "Manifest already has the frozen corpus hash."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add benchmarks/phase0b/manifest.example.json
+          git commit -m "phase 0B corpus: freeze verified blind corpus hash"
+          git push

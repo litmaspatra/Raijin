@@ -1,0 +1,29 @@
+name: Phase 0B Validate Held-out (Docker)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Write reference solutions outside the repo
+        env:
+          REF: ${{ secrets.PHASE0B_REFERENCE_SOLUTIONS }}
+        run: |
+          python - <<'PY'
+          import os, pathlib
+          text = os.environ["REF"].replace("\r\n", "\n").strip("\n") + "\n"
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "reference_solutions.jsonl"
+          out.write_bytes(text.encode("utf-8"))
+          PY
+      - name: Validate held-out set (Docker, chat and FIM paths)
+        run: |
+          python benchmarks/phase0b/validate_heldout.py \
+            --tasks benchmarks/phase0b/heldout/heldout_tasks.jsonl \
+            --reference "$RUNNER_TEMP/reference_solutions.jsonl" \
+            --manifest benchmarks/phase0b/manifest.example.json

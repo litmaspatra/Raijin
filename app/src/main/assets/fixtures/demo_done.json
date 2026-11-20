@@ -1,0 +1,4 @@
+[
+  { "state": "acting", "label": "Working", "traceId": "demo-ok" },
+  { "state": "done",   "label": "Done",    "traceId": "demo-ok" }
+]

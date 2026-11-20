@@ -1,0 +1,14 @@
+[
+  { "state": "received", "traceId": "demo-d" },
+  {
+    "state": "needs_input",
+    "label": "Destructive action",
+    "question": "This will delete files. Continue?",
+    "context": "Moved to recovery folder · 24h restore window",
+    "confirmLabel": "Delete",
+    "cancelLabel": "Cancel",
+    "isDangerous": true,
+    "traceId": "demo-d",
+    "actionId": "demo-action-2"
+  }
+]

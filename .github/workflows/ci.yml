@@ -1,0 +1,180 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref instead of letting them burn minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+      - name: Ensure Gradle 8.10.2 wrapper cached
+        run: |
+          DIST_DIR="$HOME/.gradle/wrapper/dists/gradle-8.10.2-bin/a04bxjujx95o3nb99gddekhwo"
+          if [ ! -f "$DIST_DIR/gradle-8.10.2-bin.zip.ok" ]; then
+            mkdir -p "$DIST_DIR"
+            echo "Pre-fetching Gradle 8.10.2 wrapper distribution..."
+            curl -fL --retry 3 --connect-timeout 10 -o "$DIST_DIR/gradle-8.10.2-bin.zip" \
+              "https://mirrors.cloud.tencent.com/gradle/gradle-8.10.2-bin.zip" || \
+            curl -fL --retry 3 --connect-timeout 10 -o "$DIST_DIR/gradle-8.10.2-bin.zip" \
+              "https://services.gradle.org/distributions/gradle-8.10.2-bin.zip"
+            if [ -f "$DIST_DIR/gradle-8.10.2-bin.zip" ]; then
+              echo "31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26  $DIST_DIR/gradle-8.10.2-bin.zip" | sha256sum -c -
+              unzip -q -o "$DIST_DIR/gradle-8.10.2-bin.zip" -d "$DIST_DIR"
+              touch "$DIST_DIR/gradle-8.10.2-bin.zip.ok"
+              touch "$DIST_DIR/gradle-8.10.2-bin.zip.lck"
+              echo "Gradle 8.10.2 verified and cached in $DIST_DIR"
+            fi
+          fi
+      - name: Build and test Kotlin
+        # Scoped to :brain-contract and :brain-core (pure Kotlin, tests run without Android SDK)
+        # --configure-on-demand avoids configuring :app (requires Android SDK) on this runner
+        run: ./gradlew --no-daemon --configure-on-demand :brain-contract:build :brain-core:build
+      - name: Test Phase 1D measurement harness
+        run: python -m unittest discover -s scripts/phase1d -p "test_*.py" -v
+      - name: Test Phase 0B unit suite
+        run: python -m unittest discover -s benchmarks/phase0b/tests -p "test_*.py" -v
+      - name: Verify frozen prompt hash
+        run: |
+          echo "d0d8181d602f4a2b1935ead3121f0f140d3cc87357404da0d3967f6a02b9d77a  benchmarks/phase0b/prompt_template.txt" | sha256sum -c -
+      - name: Verify frozen Phase 0B code hashes
+        run: |
+          echo "e0d3d4e1fe20fe309ca1ab8ff6aa62038c257cc57764b2003fdbe5a0757a3e1a  benchmarks/phase0b/analyze_results.py" | sha256sum -c -
+          echo "8f83e7125d9e0ef8bbd976b158224122ab84dbea3c74d43814104fd55b5dfece  benchmarks/phase0b/decision.py" | sha256sum -c -
+          echo "94aa22dc904f89b56b7991c6f111790167a2bdd1a9013104d1b61554174dec32  benchmarks/phase0b/run_benchmark.py" | sha256sum -c -
+          echo "9a37109f7e2f586475f6516fc2a463bd39f67cb7531b07b4c32fe2e39dce631f  benchmarks/phase0b/retrieval.py" | sha256sum -c -
+          echo "b17258db962ae0485b4cb53af987b6ee052a8c4e47c79ae3017eead0fb56333b  benchmarks/phase0b/harness.py" | sha256sum -c -
+          echo "8413eb7a88a8127ce8539ba35fa0a3c48c341c9a58999849c130ad329f6f0f34  benchmarks/phase0b/pins.py" | sha256sum -c -
+      - name: Verify Docker
+        run: docker version
+      - name: Pull sandbox image
+        run: docker pull python:3.12-slim@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f
+      - name: Run real Docker integration tests
+        env:
+          RAIJIN_DOCKER_INTEGRATION: "1"
+        run: python benchmarks/phase0b/tests/test_docker_integration.py -v
+      - name: Verify blind corpus in Docker
+        run: |
+          python benchmarks/phase0b/corpus/verify_corpus.py \
+            benchmarks/phase0b/corpus/corpus.jsonl \
+            benchmarks/phase0b/corpus/verification-results.jsonl
+      - name: Validate blind corpus
+        run: |
+          python benchmarks/phase0b/corpus/validate_corpus.py \
+            benchmarks/phase0b/corpus/corpus.jsonl \
+            benchmarks/phase0b/corpus/verification-results.jsonl
+      - name: Upload corpus verification record
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0b-corpus-verification
+          path: benchmarks/phase0b/corpus/verification-results.jsonl
+          if-no-files-found: error
+          retention-days: 90
+
+  android-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+      - name: Ensure Gradle 8.10.2 wrapper cached
+        run: |
+          DIST_DIR="$HOME/.gradle/wrapper/dists/gradle-8.10.2-bin/a04bxjujx95o3nb99gddekhwo"
+          if [ ! -f "$DIST_DIR/gradle-8.10.2-bin.zip.ok" ]; then
+            mkdir -p "$DIST_DIR"
+            echo "Pre-fetching Gradle 8.10.2 wrapper distribution..."
+            curl -fL --retry 3 --connect-timeout 10 -o "$DIST_DIR/gradle-8.10.2-bin.zip" \
+              "https://mirrors.cloud.tencent.com/gradle/gradle-8.10.2-bin.zip" || \
+            curl -fL --retry 3 --connect-timeout 10 -o "$DIST_DIR/gradle-8.10.2-bin.zip" \
+              "https://services.gradle.org/distributions/gradle-8.10.2-bin.zip"
+            if [ -f "$DIST_DIR/gradle-8.10.2-bin.zip" ]; then
+              echo "31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26  $DIST_DIR/gradle-8.10.2-bin.zip" | sha256sum -c -
+              unzip -q -o "$DIST_DIR/gradle-8.10.2-bin.zip" -d "$DIST_DIR"
+              touch "$DIST_DIR/gradle-8.10.2-bin.zip.ok"
+              touch "$DIST_DIR/gradle-8.10.2-bin.zip.lck"
+              echo "Gradle 8.10.2 verified and cached in $DIST_DIR"
+            fi
+          fi
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+      - name: Verify UI Paparazzi snapshots
+        # JVM screenshot verification against committed wrap-content goldens
+        # (SHRINK mode: image bounds = card bounds), including the 220dp
+        # overflow cap, scroll-to-end frames, and the AP-3 answer-needed
+        # single-Cancel clarification state. Fails on any rendering or
+        # geometry regression.
+        run: ./gradlew --no-daemon :app:verifyPaparazziDebug
+      - name: Upload UI-5 snapshot failure report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui5-paparazzi-failure
+          path: |
+            app/build/reports/paparazzi/
+            app/build/reports/tests/
+            app/build/test-results/
+            app/build/paparazzi/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Assemble debug APK
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee /tmp/gradle-build.log || {
+            echo "::error::$(base64 -w0 /tmp/gradle-build.log)"
+            exit 1
+          }
+      - name: Pre-fetch Robolectric android-all runtimes
+        run: |
+          set -euo pipefail
+          # Robolectric downloads its instrumented Android runtimes at test
+          # runtime with no retries, which flakes CI. Seed the local Maven
+          # cache so the runtime downloader finds them already present.
+          for v in 14-robolectric-10818077-i7 15-robolectric-12650502-i7; do
+            dir="$HOME/.m2/repository/org/robolectric/android-all-instrumented/$v"
+            mkdir -p "$dir"
+            for ext in jar pom; do
+              f="android-all-instrumented-$v.$ext"
+              [ -s "$dir/$f" ] || curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors \
+                "https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/$v/$f" -o "$dir/$f"
+            done
+          done
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:testDebugUnitTest 2>&1 | tee /tmp/gradle-test.log || {
+            echo "::error::$(base64 -w0 /tmp/gradle-test.log)"
+            exit 1
+          }
+      - name: Run lint (non-blocking — abortOnError=false)
+        run: ./gradlew --no-daemon :app:lintDebug || true
+      - name: Upload lint report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: warn
+          retention-days: 30

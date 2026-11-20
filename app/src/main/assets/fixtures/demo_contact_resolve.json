@@ -1,0 +1,26 @@
+[
+  {"state": "received",   "traceId": "demo0001", "label": "On it"},
+  {"state": "resolving",  "traceId": "demo0001", "label": "Finding Rahul…"},
+  {"state": "resolving",  "traceId": "demo0001", "label": "Finding Rahul…",
+    "trace": [
+      {"text": "Rahul → 2 contacts", "isConclusion": false},
+      {"text": "Context → work contacts preferred", "isConclusion": false},
+      {"text": "Rahul Work · +91 98200 00001 (Work)", "isConclusion": true}
+    ]
+  },
+  {"state": "needs_input", "traceId": "demo0001",
+    "label": "Call Rahul Work?",
+    "question": "Call Rahul Work?",
+    "context": "+91 98200 00001",
+    "confirmLabel": "Call",
+    "cancelLabel": "Cancel",
+    "actionId": "call-demo0001"
+  },
+  {"state": "acting", "traceId": "demo0001",
+    "label": "Calling Rahul Work…",
+    "actionType": "call",
+    "phoneNumber": "+919820000001",
+    "contactName": "Rahul Work"
+  },
+  {"state": "done", "traceId": "demo0001", "label": "Called Rahul Work."}
+]

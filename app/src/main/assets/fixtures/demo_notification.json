@@ -1,0 +1,10 @@
+[
+  {"state": "received",   "traceId": "demo0004", "label": "On it"},
+  {"state": "resolving",  "traceId": "demo0004", "label": "Reading notifications…"},
+  {"state": "acting",     "traceId": "demo0004",
+    "label": "Reading…",
+    "actionType": "read_notification",
+    "contactName": "Rahul Work"
+  },
+  {"state": "done", "traceId": "demo0004", "label": "Done."}
+]

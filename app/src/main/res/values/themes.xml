@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base app theme — dark, no action bar (Compose-only).
+         Parent: Theme.Material3.DayNight.NoActionBar — available via the
+         androidx.compose.material3 dependency already in :app, compatible
+         with compileSdk 35 / minSdk 29. android:Theme.Material.NoTitleBar
+         was removed in platform SDK 35. Theme.Material3.DayNight.NoActionBar
+         is not an XML resource (it is Compose-only); Theme.DeviceDefault.NoActionBar
+         is always present in the platform. -->
+    <style name="Theme.Raijin" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Transparent variant — used for MainActivity so the island floats -->
+    <style name="Theme.Raijin.Transparent" parent="Theme.Raijin">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
+</resources>

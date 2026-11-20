@@ -1,0 +1,25 @@
+[
+  {"state": "received",   "traceId": "demo0002", "label": "On it"},
+  {"state": "resolving",  "traceId": "demo0002", "label": "Finding Maa…"},
+  {"state": "resolving",  "traceId": "demo0002", "label": "Finding Maa…",
+    "trace": [
+      {"text": "Maa · +91 98100 00000 (Family)", "isConclusion": true}
+    ]
+  },
+  {"state": "needs_input", "traceId": "demo0002",
+    "label": "Send to Maa?",
+    "question": "Send to Maa?",
+    "context": "+91 98100 00000 · \"I'll come home at 7.\"",
+    "confirmLabel": "Send",
+    "cancelLabel": "Cancel",
+    "actionId": "wa-demo0002"
+  },
+  {"state": "acting", "traceId": "demo0002",
+    "label": "Sending…",
+    "actionType": "whatsapp_message",
+    "phoneNumber": "+919810000000",
+    "message": "I'll come home at 7.",
+    "contactName": "Maa"
+  },
+  {"state": "done", "traceId": "demo0002", "label": "Sent. Maa will see it."}
+]

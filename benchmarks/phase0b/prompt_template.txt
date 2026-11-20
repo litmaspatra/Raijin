@@ -1,0 +1,5 @@
+<|fim_prefix|># Raijin task {task_id}
+# Instruction: {instruction}
+# Retrieved context:
+{retrieved_context_comments}
+{prefix}<|fim_suffix|>{suffix}<|fim_middle|>

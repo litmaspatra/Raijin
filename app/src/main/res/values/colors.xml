@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Raijin palette — canonical values live in ui/theme/Theme.kt (Compose).
+     These XML colours exist so the manifest theme and any non-Compose system
+     surfaces can reference them without depending on Compose. -->
+<resources>
+    <color name="raijin_black">#FF07070F</color>
+    <color name="raijin_surface">#FF0F0F1F</color>
+    <color name="raijin_blue">#FF4A6CF7</color>
+    <color name="raijin_white">#FFE8EAFF</color>
+    <color name="raijin_green">#FF2ADC8A</color>
+    <color name="raijin_red">#FFF74A4A</color>
+</resources>

@@ -1,0 +1,9 @@
+[
+  {
+    "state": "proxy_call",
+    "contactName": "Contact",
+    "liveTranscript": "…",
+    "isListening": true,
+    "traceId": "demo-pc"
+  }
+]

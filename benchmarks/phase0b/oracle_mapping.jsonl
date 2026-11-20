@@ -1,0 +1,67 @@
+{"task_id":"py001","item_ids":[],"coverage":"uncovered","justification":"The frozen corpus contains no palindrome-search or center-expansion/DP knowledge; this task is algorithmic rather than API-driven."}
+{"task_id":"py002","item_ids":[],"coverage":"uncovered","justification":"No frozen corpus item covers interval sorting/merging logic or overlap consolidation."}
+{"task_id":"py003","item_ids":["pro-177"],"coverage":"covered","justification":"pro-177 demonstrates Decimal.quantize with ROUND_HALF_UP for exact two-decimal money rounding, the key API behavior required.","strength":"direct"}
+{"task_id":"py004","item_ids":[],"coverage":"uncovered","justification":"No frozen corpus item contains Levenshtein dynamic-programming row-update knowledge."}
+{"task_id":"py005","item_ids":["api-008"],"coverage":"covered","justification":"api-008 demonstrates csv.DictReader producing header-keyed string rows from a text stream.","strength":"direct"}
+{"task_id":"py006","item_ids":[],"coverage":"uncovered","justification":"The corpus has basic re.sub examples but no callable/group-aware substitution pattern needed for this conditional snake_case transformation."}
+{"task_id":"py007","item_ids":[],"coverage":"uncovered","justification":"The corpus lacks heapq.heappush/heappop priority-queue usage and Dijkstra stale-entry handling."}
+{"task_id":"py008","item_ids":["pro-151"],"coverage":"covered","justification":"pro-151 demonstrates a same-directory temporary path followed by os.replace for atomic-ish replacement, which is the central filesystem API pattern.","strength":"direct"}
+{"task_id":"py009","item_ids":[],"coverage":"uncovered","justification":"No frozen item covers currency-format mini-language behavior including sign placement and thousands separators."}
+{"task_id":"py010","item_ids":["pro-173"],"coverage":"covered","justification":"pro-173 demonstrates an in-memory ZipFile with ZIP_DEFLATED, writing entries and closing the archive before reading bytes.","strength":"direct"}
+{"task_id":"py011","item_ids":[],"coverage":"uncovered","justification":"No corpus item covers modular list rotation."}
+{"task_id":"py012","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains monotone first-true binary-search logic."}
+{"task_id":"py013","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains two-pointer merge of sorted sequences."}
+{"task_id":"py014","item_ids":["pat-149"],"coverage":"covered","justification":"pat-149 demonstrates stable deduplication while preserving first occurrence order, which is the substantive behavior required by this task.","strength":"direct"}
+{"task_id":"py015","item_ids":[],"coverage":"uncovered","justification":"argparse is not represented in the frozen corpus."}
+{"task_id":"py016","item_ids":[],"coverage":"uncovered","justification":"No corpus item covers recursive flattening of nested list/tuple structures."}
+{"task_id":"py017","item_ids":[],"coverage":"uncovered","justification":"No corpus item covers Caesar-shift character arithmetic and case-preserving wraparound."}
+{"task_id":"py018","item_ids":["pro-175"],"coverage":"covered","justification":"pro-175 demonstrates ThreadPoolExecutor.map and collection of results in input order; map also propagates worker exceptions on consumption.","strength":"direct"}
+{"task_id":"py019","item_ids":[],"coverage":"uncovered","justification":"The regex corpus does not demonstrate re.findall/finditer extraction of repeated signed integer matches."}
+{"task_id":"py020","item_ids":["api-013"],"coverage":"covered","justification":"api-013 demonstrates Counter.most_common, exactly the frequency-ranking API required.","strength":"direct"}
+{"task_id":"py021","item_ids":[],"coverage":"uncovered","justification":"The corpus shows Path.suffix but not Path.with_suffix or an equivalent extension-replacement operation."}
+{"task_id":"py022","item_ids":["pat-081"],"coverage":"covered","justification":"pat-081 demonstrates pathlib Path.read_text; the blank/comment filtering is straightforward adaptation around that API.","strength":"direct"}
+{"task_id":"py023","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains stack-based delimiter matching logic."}
+{"task_id":"py024","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains N-Queens backtracking/state-pruning knowledge."}
+{"task_id":"py025","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains sliding-window longest-unique-substring logic."}
+{"task_id":"py026","item_ids":["pro-157"],"coverage":"covered","justification":"pro-157 is an explicit itertools.islice chunking procedure for arbitrary iterables with a short final chunk.","strength":"direct"}
+{"task_id":"py027","item_ids":[],"coverage":"uncovered","justification":"The corpus lacks os.makedirs or Path.mkdir(parents=True, exist_ok=True), which is the key API requirement."}
+{"task_id":"py028","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains run-length encoding over consecutive characters."}
+{"task_id":"py029","item_ids":["api-037"],"coverage":"covered","justification":"api-037 demonstrates dataclasses.field(default_factory=list), preventing shared mutable defaults.","strength":"direct"}
+{"task_id":"py030","item_ids":["pro-164"],"coverage":"covered","justification":"pro-164 demonstrates @contextmanager with try/finally cleanup around yield, matching the required exit-event guarantee.","strength":"direct"}
+{"task_id":"py031","item_ids":["pro-169"],"coverage":"covered","justification":"pro-169 demonstrates urlsafe_b64encode/urlsafe_b64decode; removing '=' and decoding to str are small adaptations around the correct API.","strength":"direct"}
+{"task_id":"py032","item_ids":["api-020"],"coverage":"covered","justification":"api-020 demonstrates bisect_left, the key standard-library operation used to maintain LIS tails in O(n log n).","strength":"partial"}
+{"task_id":"py033","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains iterative grid flood-fill/island counting with an explicit stack."}
+{"task_id":"py034","item_ids":["api-009"],"coverage":"covered","justification":"api-009 demonstrates date.fromisoformat; date subtraction then yields the signed timedelta needed.","strength":"partial"}
+{"task_id":"py035","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains second-largest-distinct tracking logic."}
+{"task_id":"py036","item_ids":["api-046","pat-148"],"coverage":"covered","justification":"api-046 demonstrates an isolated seeded random.Random instance and pat-148 demonstrates sample without replacement, jointly satisfying reproducibility without touching global state.","strength":"direct"}
+{"task_id":"py037","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains downward-capacity 0/1 knapsack dynamic programming."}
+{"task_id":"py038","item_ids":[],"coverage":"uncovered","justification":"shlex is absent from the frozen corpus."}
+{"task_id":"py039","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains Kahn-style topological sorting or deque.popleft indegree processing."}
+{"task_id":"py040","item_ids":["pat-105"],"coverage":"covered","justification":"pat-105 demonstrates sqlite3.executemany with '?' parameter binding, which is exactly the insertion API requirement.","strength":"direct"}
+{"task_id":"py041","item_ids":[],"coverage":"uncovered","justification":"No corpus item covers alternating interleave with leftover-tail handling."}
+{"task_id":"py042","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains Roman-numeral subtractive parsing logic."}
+{"task_id":"py043","item_ids":["pat-131"],"coverage":"covered","justification":"pat-131 demonstrates textwrap.wrap with a width limit and word-boundary wrapping.","strength":"direct"}
+{"task_id":"py044","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains maximal consecutive-range grouping logic."}
+{"task_id":"py045","item_ids":[],"coverage":"uncovered","justification":"No corpus item covers manual repeated division/modulo binary conversion."}
+{"task_id":"py046","item_ids":["pat-098"],"coverage":"covered","justification":"pat-098 demonstrates bisect.insort mutating an already-sorted list while preserving order.","strength":"direct"}
+{"task_id":"py047","item_ids":["pat-119"],"coverage":"covered","justification":"pat-119 contains the canonical max(lo, min(hi, x)) clamp idiom; only bound swapping must be adapted.","strength":"direct"}
+{"task_id":"py048","item_ids":[],"coverage":"uncovered","justification":"The datetime corpus lacks datetime.strptime and custom-format parsing."}
+{"task_id":"py049","item_ids":["pat-150"],"coverage":"covered","justification":"pat-150 demonstrates sorted(..., key=...), the needed derived-key sorting API; descending score and tie-name ordering are adaptations.","strength":"partial"}
+{"task_id":"py050","item_ids":[],"coverage":"uncovered","justification":"The corpus has functools helpers but no functools.wraps/update_wrapper metadata-preservation pattern."}
+{"task_id":"py051","item_ids":["pat-091"],"coverage":"covered","justification":"pat-091 demonstrates grouping values into defaultdict(list), directly matching the grouping structure.","strength":"direct"}
+{"task_id":"py052","item_ids":[],"coverage":"uncovered","justification":"The statistics corpus covers mean and median but not pstdev/population standard deviation."}
+{"task_id":"py053","item_ids":["pat-093"],"coverage":"covered","justification":"pat-093 demonstrates chain.from_iterable for one-level flattening.","strength":"direct"}
+{"task_id":"py054","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains Pascal-triangle row recurrence construction."}
+{"task_id":"py055","item_ids":["rep-195","pat-115"],"coverage":"covered","justification":"rep-195 demonstrates UTF-8 text hashing with SHA-256 and pat-115 demonstrates digest-byte production; conversion of digest bytes to a big-endian integer is the remaining adaptation.","strength":"partial"}
+{"task_id":"py056","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains unbounded coin-change minimum-count dynamic programming."}
+{"task_id":"py057","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains running-prefix maximum accumulation."}
+{"task_id":"py058","item_ids":["api-006"],"coverage":"covered","justification":"api-006 demonstrates json.loads, the core decoding API; exception handling and preserving valid JSON null are task-specific adaptation.","strength":"partial"}
+{"task_id":"py059","item_ids":["pat-096"],"coverage":"covered","justification":"pat-096 demonstrates functools.reduce with an explicit initializer, which supports the required empty-product identity of 1.","strength":"direct"}
+{"task_id":"py060","item_ids":[],"coverage":"uncovered","justification":"The warnings items do not demonstrate warnings.warn with DeprecationWarning and stacklevel attribution to the caller."}
+{"task_id":"py061","item_ids":["pat-092"],"coverage":"covered","justification":"pat-092 demonstrates deque(maxlen=...), the bounded-memory primitive needed to retain only the last n streamed items.","strength":"direct"}
+{"task_id":"py062","item_ids":["api-004"],"coverage":"covered","justification":"api-004 demonstrates os.path.splitext splitting at the final extension boundary; stripping the leading dot is a small adaptation.","strength":"partial"}
+{"task_id":"py063","item_ids":[],"coverage":"uncovered","justification":"The corpus lacks os.walk, Path.rglob, or another recursive filesystem traversal API."}
+{"task_id":"py064","item_ids":["pat-097"],"coverage":"covered","justification":"pat-097 demonstrates heapq.nlargest for top-k selection; adapting it to dict items and returning names is straightforward.","strength":"direct"}
+{"task_id":"py065","item_ids":[],"coverage":"uncovered","justification":"No corpus item contains longest-common-prefix scanning logic."}
+{"task_id":"py066","item_ids":[],"coverage":"uncovered","justification":"The corpus demonstrates urlparse/parse_qsl but not parse_qs semantics preserving repeated query values as lists, which this task relies on."}
+{"task_id":"py067","item_ids":["api-005"],"coverage":"covered","justification":"api-005 demonstrates json.dumps with sort_keys; indent=2 and ensure_ascii=False are additional json.dumps options not otherwise represented.","strength":"partial"}

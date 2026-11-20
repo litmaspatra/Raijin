@@ -1,0 +1,47 @@
+[
+  {
+    "task_id": "pilot-single-line",
+    "language": "python",
+    "instruction": "Return a plus b.",
+    "prefix": "def add(a, b):\n    ",
+    "suffix": "\n",
+    "test_code": "assert True\n",
+    "knowledge_dependency": "reasoning-only"
+  },
+  {
+    "task_id": "pilot-nested-block",
+    "language": "python",
+    "instruction": "Return the first positive value, otherwise zero.",
+    "prefix": "def first_positive(values):\n    ",
+    "suffix": "\n",
+    "test_code": "assert True\n",
+    "knowledge_dependency": "reasoning-only"
+  },
+  {
+    "task_id": "pilot-if-else",
+    "language": "python",
+    "instruction": "Return 'even' for even n and 'odd' otherwise.",
+    "prefix": "def parity(n):\n    ",
+    "suffix": "\n",
+    "test_code": "assert True\n",
+    "knowledge_dependency": "reasoning-only"
+  },
+  {
+    "task_id": "pilot-api-call",
+    "language": "python",
+    "instruction": "Return the filename component of path using pathlib.",
+    "prefix": "from pathlib import Path\n\ndef filename(path):\n    ",
+    "suffix": "\n",
+    "test_code": "assert True\n",
+    "knowledge_dependency": "api-knowledge"
+  },
+  {
+    "task_id": "pilot-suffix-shape",
+    "language": "python",
+    "instruction": "Return name stripped and uppercased.",
+    "prefix": "def clean_name(name):\n    ",
+    "suffix": "\n\nRESULT = clean_name(' alice ')\n",
+    "test_code": "assert True\n",
+    "knowledge_dependency": "reasoning-only"
+  }
+]

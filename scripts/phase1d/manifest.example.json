@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "device": "iQOO Z9s",
+  "llama_bench": {
+    "path": "/absolute/path/to/llama-bench",
+    "sha256": "REPLACE_WITH_64_HEX",
+    "source_revision": "REPLACE_WITH_EXACT_COMMIT"
+  },
+  "models": [
+    {
+      "path": "/absolute/path/to/model.Q4_K_M.gguf",
+      "sha256": "REPLACE_WITH_64_HEX",
+      "parameters_billion": 1.5,
+      "quantization": "Q4_K_M",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT"
+    }
+  ],
+  "stt": null,
+  "protocol": {
+    "threads": 4,
+    "prefill_tokens": 512,
+    "generate_tokens": 128,
+    "thermal_seconds": 120
+  }
+}

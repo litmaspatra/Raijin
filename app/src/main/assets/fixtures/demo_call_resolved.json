@@ -1,0 +1,24 @@
+[
+  {"state": "received",   "traceId": "demo0003", "label": "On it"},
+  {"state": "resolving",  "traceId": "demo0003", "label": "Finding Maa…"},
+  {"state": "resolving",  "traceId": "demo0003", "label": "Finding Maa…",
+    "trace": [
+      {"text": "Maa · +91 98100 00000 (Family)", "isConclusion": true}
+    ]
+  },
+  {"state": "needs_input", "traceId": "demo0003",
+    "label": "Call Maa?",
+    "question": "Call Maa?",
+    "context": "+91 98100 00000",
+    "confirmLabel": "Call",
+    "cancelLabel": "Cancel",
+    "actionId": "call-demo0003"
+  },
+  {"state": "acting", "traceId": "demo0003",
+    "label": "Calling Maa…",
+    "actionType": "call",
+    "phoneNumber": "+919810000000",
+    "contactName": "Maa"
+  },
+  {"state": "done", "traceId": "demo0003", "label": "Called Maa."}
+]

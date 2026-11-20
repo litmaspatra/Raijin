@@ -1,0 +1,5 @@
+[
+  {"state": "thinking",  "label": "Setting reminder…"},
+  {"state": "acting",    "label": "Saving…"},
+  {"state": "done",      "label": "Reminder set. I'll remind you tomorrow morning."}
+]

@@ -1,0 +1,73 @@
+name: Phase 0B Format Pilot
+
+on:
+  push:
+    paths:
+      - ".github/workflows/phase0b-format-pilot.yml"
+      - "benchmarks/phase0b/pilot/run_format_pilot.py"
+      - "benchmarks/phase0b/pilot/tasks.json"
+      - "benchmarks/phase0b/prompt_template.txt"
+      - "benchmarks/phase0b/harness.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned llama.cpp release
+        shell: bash
+        run: |
+          set -euo pipefail
+          LLAMA_TAG="b11436"
+          LLAMA_ASSET="llama-b11436-bin-ubuntu-x64.tar.gz"
+          LLAMA_SHA256="2fb4070732a94cd627d83af65bca72be6af7498ede330ec650a7c55ba7f7c1c2"
+          LLAMA_ARCHIVE="$RUNNER_TEMP/$LLAMA_ASSET"
+          LLAMA_DIR="$RUNNER_TEMP/llama-cpp"
+
+          curl -L --fail --retry 3 \
+            -o "$LLAMA_ARCHIVE" \
+            "https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/$LLAMA_ASSET"
+          echo "$LLAMA_SHA256  $LLAMA_ARCHIVE" | sha256sum -c -
+
+          mkdir -p "$LLAMA_DIR"
+          tar -xzf "$LLAMA_ARCHIVE" -C "$LLAMA_DIR"
+          LLAMA_BIN="$(find "$LLAMA_DIR" -type f -name llama-completion -perm -111 | head -n 1 || true)"
+          if [ -z "$LLAMA_BIN" ]; then
+            echo "pinned llama-completion executable not found in release asset" >&2
+            exit 1
+          fi
+
+          echo "LLAMA_BIN=$LLAMA_BIN" >> "$GITHUB_ENV"
+          echo "RAIJIN_LLAMA_CPP_TAG=$LLAMA_TAG" >> "$GITHUB_ENV"
+          echo "RAIJIN_LLAMA_CPP_ASSET_SHA256=$LLAMA_SHA256" >> "$GITHUB_ENV"
+          "$LLAMA_BIN" --version
+      - name: Download Qwen2.5-Coder-0.5B Q4_K_M
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODEL_PATH="$RUNNER_TEMP/Qwen2.5-Coder-0.5B.Q4_K_M.gguf"
+          MODEL_SHA256="8d548c47eb7eeb3b0dbfe0f7110226c075dd0ab797d714a72fe9bf54c4a336e5"
+          curl -L --fail --retry 3 \
+            -o "$MODEL_PATH" \
+            "https://huggingface.co/mradermacher/Qwen2.5-Coder-0.5B-GGUF/resolve/main/Qwen2.5-Coder-0.5B.Q4_K_M.gguf"
+          echo "$MODEL_SHA256  $MODEL_PATH" | sha256sum -c -
+          echo "RAIJIN_PILOT_MODEL_PATH=$MODEL_PATH" >> "$GITHUB_ENV"
+      - name: Run five-task real-model FIM pilot
+        run: python benchmarks/phase0b/pilot/run_format_pilot.py
+      - name: Upload raw pilot outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0b-format-pilot
+          path: |
+            benchmarks/phase0b/pilot/pilot-output.jsonl
+            benchmarks/phase0b/pilot/pilot-metadata.json
+          if-no-files-found: error
+          retention-days: 90

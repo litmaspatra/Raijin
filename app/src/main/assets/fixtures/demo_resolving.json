@@ -1,0 +1,13 @@
+[
+  { "state": "received", "traceId": "demo-r" },
+  {
+    "state": "resolving",
+    "label": "Resolving",
+    "traceId": "demo-r",
+    "trace": [
+      { "text": "Step A", "isConclusion": false },
+      { "text": "Step B", "isConclusion": false },
+      { "text": "Conclusion reached", "isConclusion": true }
+    ]
+  }
+]

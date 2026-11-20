@@ -1,0 +1,205 @@
+{
+  "benchmark_version": "phase0b-v3",
+  "heldout_sha256": "51bd5f50ef95caf54b9a32c7a2966dd9f43686e14c7129c904a869c91a6152f9",
+  "corpus_sha256": "82002b908d0ca799a907f21687bfedd59b4fe693621298b26a13e721bf17243b",
+  "prompt_sha256": "d0d8181d602f4a2b1935ead3121f0f140d3cc87357404da0d3967f6a02b9d77a",
+  "oracle_mapping_sha256": "afd96678ddc6573c7116eb6499a5f72da9d7155173e395149dcedc9da7eb786c",
+  "reference_solutions_sha256": "cde6f05dc53869157b80e6ffe042c0f52f3bf179de112991b5293e5e5f47ee8c",
+  "bootstrap_seed": 0,
+  "bootstrap_repetitions": 10000,
+  "primary_condition": "hybrid",
+  "secondary_condition": "fts",
+  "primary_model": {
+    "family": "Qwen2.5-Coder-0.5B",
+    "variant": "base",
+    "gguf_artifact": {
+      "filename": "Qwen2.5-Coder-0.5B.Q4_K_M.gguf",
+      "source": "https://huggingface.co/mradermacher/Qwen2.5-Coder-0.5B-GGUF/resolve/main/Qwen2.5-Coder-0.5B.Q4_K_M.gguf",
+      "sha256": "8d548c47eb7eeb3b0dbfe0f7110226c075dd0ab797d714a72fe9bf54c4a336e5"
+    },
+    "quantization": "Q4_K_M",
+    "temperature": 0,
+    "seed": 0,
+    "max_output_tokens": 128,
+    "prompt_format": "native_fim"
+  },
+  "conditions": [
+    {
+      "id": "A",
+      "name": "raw",
+      "retrieval": "none"
+    },
+    {
+      "id": "B",
+      "name": "fts",
+      "retrieval": "FTS5 BM25 top-3"
+    },
+    {
+      "id": "C",
+      "name": "hybrid",
+      "retrieval": "FTS5+MiniLM RRF top-3",
+      "primary": true
+    },
+    {
+      "id": "D",
+      "name": "oracle",
+      "retrieval": "frozen oracle mapping IDs",
+      "population": "covered only"
+    },
+    {
+      "id": "E",
+      "name": "wrong_snippet",
+      "retrieval": "deterministic random same-kind item"
+    },
+    {
+      "id": "F",
+      "name": "1_5b_raw",
+      "retrieval": "none",
+      "reference": true,
+      "optional_if_time_allows": true
+    }
+  ],
+  "minimum_heldout_tasks": 60,
+  "retrieval_adoption_threshold_percentage_points": 25,
+  "ci_lower_bound_threshold_percentage_points": 5,
+  "max_reasoning_only_tasks_worse": 2,
+  "oracle_covered_min_pass_rate": 0.6,
+  "candidate_inner_timeout_seconds": 5,
+  "candidate_outer_timeout_seconds": 20,
+  "llama_cpp": {
+    "release_tag": "b11436",
+    "asset": "llama-b11436-bin-ubuntu-x64.tar.gz",
+    "asset_sha256": "2fb4070732a94cd627d83af65bca72be6af7498ede330ec650a7c55ba7f7c1c2",
+    "source": "https://github.com/ggml-org/llama.cpp/releases/download/b11436/llama-b11436-bin-ubuntu-x64.tar.gz"
+  },
+  "primary_gate_population": "covered",
+  "max_uncovered_net_tasks_worse": 3,
+  "report_only_splits": [
+    "overall",
+    "direct",
+    "partial"
+  ],
+  "pre_run_amendment": {
+    "timing": "after_coverage_split_before_any_model_output",
+    "note": "Primary gate changed to hybrid-vs-raw on covered tasks; uncovered is a net-regression control; overall and direct/partial are report-only."
+  },
+  "environment": {
+    "github_runner": "ubuntu-24.04",
+    "python_sandbox_image": "python:3.12-slim@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f",
+    "python_sandbox_digest": "sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f"
+  },
+  "retrieval": {
+    "query": {
+      "format": "instruction + newline + last one-line function signature from prefix",
+      "allowed_task_fields": [
+        "instruction",
+        "prefix"
+      ],
+      "forbidden_fields": [
+        "test_code",
+        "reference_solutions",
+        "oracle_mapping"
+      ],
+      "oracle_mapping_exception": "condition D only"
+    },
+    "document_text": "title + newline + content",
+    "fts": {
+      "engine": "SQLite FTS5",
+      "ranking": "BM25",
+      "tokenization": "unicode61",
+      "query_terms": "lowercased identifier/number tokens, deduplicated in first-seen order, OR-combined"
+    },
+    "vector": {
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "backend": "ONNX Runtime CPU",
+      "revision": "10dbd2f06a8baf40ad285b037edda610c1b9a57c",
+      "model_file": "onnx/model.onnx",
+      "model_sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+      "pooling": "attention-mask mean pooling",
+      "normalization": "L2",
+      "max_input_tokens": 256,
+      "tokenizer_sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+    },
+    "hybrid": {
+      "fusion": "reciprocal_rank_fusion",
+      "rrf_k": 60,
+      "rank_inputs": "full FTS match list + full 200-item vector rank"
+    },
+    "top_k": 3,
+    "context_budget_tokens": 400,
+    "context_budget_tokenizer": {
+      "model": "Qwen/Qwen2.5-Coder-0.5B",
+      "revision": "8123ea2e9354afb7ffcc6c8641d1b2f5ecf18301",
+      "file": "tokenizer.json",
+      "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+    },
+    "context_injection": "each line passed to existing # comment wrapper in FIM prefix",
+    "wrong_snippet": {
+      "basis_kind": "FTS rank-1 kind; vector rank-1 kind only if FTS has no hits",
+      "selection": "deterministic random from same kind",
+      "seed_source": "manifest primary_model.seed + task_id SHA-256",
+      "exclusions": "FTS top-3 and hybrid top-3",
+      "oracle_mapping_used": false
+    },
+    "context_budget_measurement": "Qwen token count after # comment-line wrapping"
+  },
+  "reference_model_1_5b": {
+    "family": "Qwen2.5-Coder-1.5B",
+    "variant": "base",
+    "gguf_artifact": {
+      "filename": "Qwen2.5-Coder-1.5B.Q4_K_M.gguf",
+      "source": "https://huggingface.co/QuantFactory/Qwen2.5-Coder-1.5B-GGUF/resolve/4a3ad87f47738fded697ed0a76bcce95208a2f68/Qwen2.5-Coder-1.5B.Q4_K_M.gguf",
+      "sha256": "a9ccb6be802412e61e1acbee6287a23b11e56e94718560f910075c64b6194910"
+    },
+    "quantization": "Q4_K_M",
+    "temperature": 0,
+    "seed": 0,
+    "max_output_tokens": 128,
+    "prompt_format": "native_fim"
+  },
+  "runner": {
+    "workflow": "Phase 0B Benchmark Runner",
+    "trigger": "workflow_dispatch only",
+    "execution_order": [
+      "A_raw",
+      "B_fts",
+      "C_hybrid",
+      "D_oracle",
+      "E_wrong",
+      "F_1_5b_raw"
+    ],
+    "same_runner_job": true,
+    "logging": [
+      "prompt",
+      "raw_output",
+      "normalized_output",
+      "pass_flag",
+      "retrieval_ids_and_ranks",
+      "timings",
+      "retrieval_failure",
+      "ranking_failure",
+      "adaptation_failure",
+      "verification_failure",
+      "model_error",
+      "wrong_snippet_in_oracle",
+      "incremental_summary_json"
+    ],
+    "raw_conditions_skip_retrieval": true,
+    "llama_threads": 4,
+    "model_wall_label": "model_wall_including_model_load",
+    "model_wall_includes_model_load": true,
+    "dry_run": {
+      "input": "dry_run",
+      "tasks": "benchmarks/phase0b/pilot/tasks.json",
+      "task_count": 5,
+      "official_gate_analysis": false,
+      "artifact_name": "phase0b-dry-run-logs"
+    }
+  },
+  "analysis_script_sha256": "e0d3d4e1fe20fe309ca1ab8ff6aa62038c257cc57764b2003fdbe5a0757a3e1a",
+  "decision_sha256": "8f83e7125d9e0ef8bbd976b158224122ab84dbea3c74d43814104fd55b5dfece",
+  "runner_sha256": "94aa22dc904f89b56b7991c6f111790167a2bdd1a9013104d1b61554174dec32",
+  "retrieval_sha256": "9a37109f7e2f586475f6516fc2a463bd39f67cb7531b07b4c32fe2e39dce631f",
+  "harness_sha256": "b17258db962ae0485b4cb53af987b6ee052a8c4e47c79ae3017eead0fb56333b",
+  "pins_sha256": "8413eb7a88a8127ce8539ba35fa0a3c48c341c9a58999849c130ad329f6f0f34"
+}

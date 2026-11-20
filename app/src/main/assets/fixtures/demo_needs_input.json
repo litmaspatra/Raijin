@@ -1,0 +1,15 @@
+[
+  { "state": "received", "traceId": "demo-n" },
+  { "state": "thinking", "label": "Working on it", "traceId": "demo-n" },
+  {
+    "state": "needs_input",
+    "label": "Confirm action",
+    "question": "Proceed?",
+    "context": "This action cannot be undone immediately",
+    "confirmLabel": "Yes",
+    "cancelLabel": "No",
+    "isDangerous": false,
+    "traceId": "demo-n",
+    "actionId": "demo-action-1"
+  }
+]

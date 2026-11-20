@@ -1,0 +1,233 @@
+package com.raijin.app.bridge
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import android.util.Log
+import com.raijin.app.RaijinDatabase
+import com.raijin.app.RaijinService
+import com.raijin.app.reminder.ReminderBroadcastReceiver
+import com.raijin.app.reminder.ReminderEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/**
+ * Background perception sentinel.
+ *
+ * Continuously monitors notifications from critical communications channels
+ * (WhatsApp, Gmail, Outlook, Messages, SMS):
+ * 1. Maintains live unread counts for morning briefings.
+ * 2. Scans text for dates, flights, meetings, and bills to auto-schedule reminders.
+ * 3. Proactively triggers exact alarms and notifies the floating HUD overlay.
+ */
+class NotificationListenerService : NotificationListenerService() {
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    companion object {
+        private const val TAG = "RaijinNotifListener"
+
+        private val WATCHED_PACKAGES = setOf(
+            "com.whatsapp",
+            "com.whatsapp.w4b",
+            "com.google.android.gm",
+            "com.microsoft.office.outlook",
+            "com.google.android.apps.messaging",
+        )
+
+        /**
+         * One cached entry per active notification key. Bodies are stored only
+         * as sanitized one-line snippets (or not at all): raw notification text
+         * is never kept and never leaves the device.
+         */
+        data class CachedNotification(
+            val pkg: String,
+            val appLabel: String,
+            val snippet: String?,
+            val kind: io.raijin.brain.BriefingText.SummaryKind,
+            val postTimeMs: Long,
+        )
+
+        private const val MAX_CACHED = 60
+
+        private val activeMessages = java.util.concurrent.ConcurrentHashMap<String, CachedNotification>()
+        @Volatile var listenerConnected: Boolean = false
+            private set
+        val cachedUnread: Map<String, Int>
+            get() = activeMessages.values.groupingBy { it.pkg }.eachCount()
+
+        /** Packages never summarized: Raijin itself and the system UI. */
+        private val EXCLUDED_PACKAGES = setOf("com.raijin.app", "com.android.systemui", "android")
+
+        /**
+         * Per-app digest for briefings: label, active count, and the newest
+         * sanitized snippet (null when every body is suppressed).
+         */
+        val cachedAppDigests: List<io.raijin.brain.BriefingText.AppDigest>
+            get() = activeMessages.values
+                .groupBy { it.pkg }
+                .map { (_, list) ->
+                    val newest = list.maxByOrNull { it.postTimeMs }
+                    io.raijin.brain.BriefingText.AppDigest(
+                        label = newest?.appLabel ?: list.first().pkg,
+                        count = list.size,
+                        snippet = newest?.snippet,
+                        kind = newest?.kind ?: io.raijin.brain.BriefingText.SummaryKind.SUPPRESSED,
+                    )
+                }
+                .sortedByDescending { it.count }
+
+        /** Cache of recently scheduled event titles to prevent duplicate reminders */
+        private val recentEventTitles = mutableSetOf<String>()
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        val extras = sbn.notification.extras
+        val title  = extras.getString("android.title") ?: ""
+        val text   = extras.getCharSequence("android.text")?.toString() ?: ""
+
+        cacheNotification(sbn)
+
+        // Proactive detection stays limited to watched communication channels.
+        if (sbn.packageName in WATCHED_PACKAGES && title.isNotBlank()) {
+            serviceScope.launch {
+                handleProactivePerception(title, text, sbn.packageName)
+            }
+        }
+    }
+
+    /**
+     * Cache one active notification (all apps except self/system). Updates to
+     * the same key replace the previous entry, so a self-updating notification
+     * is never double-counted. Called from both onNotificationPosted and
+     * onListenerConnected; proactive perception is NOT re-run from here.
+     */
+    private fun cacheNotification(sbn: StatusBarNotification) {
+        if (sbn.packageName in EXCLUDED_PACKAGES) return
+        if (sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = sbn.notification.extras
+        val title = extras.getString("android.title") ?: ""
+        val text = extras.getCharSequence("android.text")?.toString() ?: ""
+        val suppressed = NotificationSanitizer.isBodySuppressed(
+            sbn.packageName,
+            sbn.notification.category,
+            sbn.notification.visibility,
+            android.app.Notification.VISIBILITY_SECRET,
+        )
+        val raw = text.ifBlank { title }
+        val sanitized = if (suppressed) null else NotificationSanitizer.sanitize(raw)
+        // Deterministic extraction first (grounded fact re-statement); fall
+        // back to the sanitized preview quote, never an invented summary.
+        val extraction = if (sanitized != null) NotificationSanitizer.extractAlert(raw) else null
+        val (snippet, kind) = when {
+            sanitized == null -> null to io.raijin.brain.BriefingText.SummaryKind.SUPPRESSED
+            extraction != null -> extraction to io.raijin.brain.BriefingText.SummaryKind.EXTRACTION
+            else -> sanitized to io.raijin.brain.BriefingText.SummaryKind.PREVIEW
+        }
+        activeMessages[sbn.key] = CachedNotification(
+            pkg = sbn.packageName,
+            appLabel = resolveAppLabel(sbn.packageName),
+            snippet = snippet,
+            kind = kind,
+            postTimeMs = sbn.postTime,
+        )
+        evictOverflow()
+    }
+
+    private fun resolveAppLabel(pkg: String): String = try {
+        packageManager.getApplicationLabel(
+            packageManager.getApplicationInfo(pkg, 0),
+        ).toString()
+    } catch (_: Exception) {
+        pkg
+    }
+
+    private fun evictOverflow() {
+        if (activeMessages.size <= MAX_CACHED) return
+        val overflow = activeMessages.size - MAX_CACHED
+        activeMessages.entries
+            .sortedBy { it.value.postTimeMs }
+            .take(overflow)
+            .forEach { activeMessages.remove(it.key, it.value) }
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        activeMessages.remove(sbn.key)
+    }
+
+    private suspend fun handleProactivePerception(title: String, text: String, pkg: String) {
+        val detected = ProactiveNotificationParser.parse(title, text) ?: return
+
+        // Deduplication: Avoid scheduling the exact same reminder twice
+        val dedupKey = "${detected.title}_${detected.triggerEpochMs / 60000}"
+        synchronized(recentEventTitles) {
+            if (dedupKey in recentEventTitles) return
+            recentEventTitles.add(dedupKey)
+            if (recentEventTitles.size > 100) {
+                recentEventTitles.clear()
+            }
+        }
+
+        try {
+            val db = RaijinDatabase.getInstance(applicationContext)
+            val reminder = ReminderEntity(
+                text = detected.title,
+                triggerTime = detected.triggerEpochMs / 1000,
+                context = "Detected from $pkg: $text",
+                createdAt = System.currentTimeMillis() / 1000,
+            )
+
+            val id = db.reminderDao().upsert(reminder)
+
+            // Schedule exact alarm
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(this, ReminderBroadcastReceiver::class.java).apply {
+                setAction(ReminderBroadcastReceiver.ACTION_FIRE)
+                putExtra(ReminderBroadcastReceiver.EXTRA_REMINDER_ID, id)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                id.toInt(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, detected.triggerEpochMs, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, detected.triggerEpochMs, pendingIntent)
+            }
+
+            Log.i(TAG, "Proactively scheduled reminder '$detected.title' for epoch ${detected.triggerEpochMs}")
+
+            // Relay to HUD / TTS if RaijinService is running
+            RaijinService.notifyProactiveEvent(detected.title, detected.category)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to persist proactive reminder: ${e.message}", e)
+        }
+    }
+
+    override fun onListenerConnected() {
+        activeMessages.clear()
+        try {
+            activeNotifications?.forEach { sbn -> cacheNotification(sbn) }
+            listenerConnected = true
+        } catch (e: Exception) {
+            listenerConnected = false
+            Log.w(TAG, "Couldn't read active notifications", e)
+        }
+    }
+
+    override fun onListenerDisconnected() {
+        listenerConnected = false
+        activeMessages.clear()
+        Log.w(TAG, "Notification listener disconnected")
+    }
+}

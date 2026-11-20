@@ -1,0 +1,7 @@
+[
+  { "state": "received",  "traceId": "demo-f" },
+  { "state": "resolving", "label": "Checking", "traceId": "demo-f", "trace": [
+      { "text": "Could not resolve", "isConclusion": true }
+  ]},
+  { "state": "failed", "label": "Could not complete", "traceId": "demo-f" }
+]

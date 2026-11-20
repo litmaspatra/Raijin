@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths for ActionExecutor.executeOpenFile / executeShareFile.
+    Exposes the app's external files dir and the public Downloads folder.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- App-private external storage: /sdcard/Android/data/com.raijin.app/files/ -->
+    <external-files-path name="external_files" path="." />
+    <!-- App-private internal cache: useful for temp share files -->
+    <cache-path name="cache" path="." />
+    <!-- External cache -->
+    <external-cache-path name="external_cache" path="." />
+</paths>

@@ -1,0 +1,78 @@
+{
+  "adopt": false,
+  "counts": {
+    "covered": 29,
+    "direct": 22,
+    "gate_model_errors": 0,
+    "model_errors": 0,
+    "partial": 7,
+    "reasoning_only": 16,
+    "tasks": 67,
+    "uncovered": 38
+  },
+  "covered_primary": {
+    "lower_95": -0.3793103448275862,
+    "point_estimate": -0.2068965517241379,
+    "upper_95": -0.06896551724137931
+  },
+  "gate_model_errors": [],
+  "model_errors": [],
+  "oracle_covered_pass_rate": 0.41379310344827586,
+  "reasoning_only_worse_count": 1,
+  "reasons": [
+    "hybrid lift on covered tasks is below +25 percentage points",
+    "covered-task 95% paired-bootstrap CI lower bound is not above +5 percentage points",
+    "oracle pass rate on covered tasks is below 60%"
+  ],
+  "report_only": {
+    "B_vs_A_covered": {
+      "lower_95": -0.24137931034482762,
+      "point_estimate": -0.10344827586206895,
+      "upper_95": 0.03448275862068967
+    },
+    "E_vs_A_covered": {
+      "lower_95": -0.103448275862069,
+      "point_estimate": 0.03448275862068961,
+      "upper_95": 0.1724137931034483
+    },
+    "condition_pass_rates": {
+      "A_raw": {"available": true, "pass_rate": 0.40298507462686567, "passed": 27, "total": 67},
+      "B_fts": {"available": true, "pass_rate": 0.34328358208955223, "passed": 23, "total": 67},
+      "C_hybrid": {"available": true, "pass_rate": 0.3283582089552239, "passed": 22, "total": 67},
+      "D_oracle": {"available": true, "pass_rate": 0.41379310344827586, "passed": 12, "total": 29},
+      "E_wrong": {"available": true, "pass_rate": 0.417910447761194, "passed": 28, "total": 67},
+      "F_1_5b_raw": {"available": true, "pass_rate": 0.582089552238806, "passed": 39, "total": 67}
+    },
+    "direct": {
+      "lower_95": -0.36363636363636365,
+      "point_estimate": -0.18181818181818182,
+      "upper_95": -0.045454545454545414
+    },
+    "failure_category_counts": {
+      "C_hybrid": {
+        "adaptation_failure": 9,
+        "ranking_failure": 11,
+        "retrieval_failure": 0,
+        "verification_failure": 45
+      },
+      "D_oracle": {
+        "adaptation_failure": 17,
+        "ranking_failure": 0,
+        "retrieval_failure": 0,
+        "verification_failure": 17
+      }
+    },
+    "overall": {
+      "lower_95": -0.17910447761194032,
+      "point_estimate": -0.07462686567164178,
+      "upper_95": 0.02985074626865669
+    },
+    "partial": {
+      "lower_95": -0.5714285714285714,
+      "point_estimate": -0.2857142857142857,
+      "upper_95": 0.0
+    }
+  },
+  "uncovered_net_tasks_worse": -1,
+  "valid_run": true
+}

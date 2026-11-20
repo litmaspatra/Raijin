@@ -1,0 +1,5 @@
+[
+  {"state": "thinking",  "label": "Learning…"},
+  {"state": "acting",    "label": "Saving skill…"},
+  {"state": "done",      "label": "Got it. I'll remember how to do that."}
+]

@@ -1,0 +1,4 @@
+[
+  {"state": "acting",    "label": "Reminder", "subLabel": "call Rahul"},
+  {"state": "done",      "label": "Reminder delivered."}
+]
