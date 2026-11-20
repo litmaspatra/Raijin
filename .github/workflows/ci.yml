@@ -120,6 +120,30 @@ jobs:
           fi
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+      - name: Render environment diagnostics
+        run: |
+          java -version 2>&1
+          uname -a
+          locale 2>/dev/null | head -3 || true
+          fc-list 2>/dev/null | wc -l
+          fc-list 2>/dev/null | grep -ciE 'devanagari|noto' || true
+      - name: Assemble debug APK
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee /tmp/gradle-build.log || {
+            echo "::error::$(base64 -w0 /tmp/gradle-build.log)"
+            exit 1
+          }
+      - name: Run lint (non-blocking — abortOnError=false)
+        run: ./gradlew --no-daemon :app:lintDebug || true
+      - name: Upload lint report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify UI Paparazzi snapshots
         # JVM screenshot verification against committed wrap-content goldens
         # (SHRINK mode: image bounds = card bounds), including the 220dp
@@ -139,13 +163,6 @@ jobs:
             app/build/paparazzi/
           if-no-files-found: warn
           retention-days: 14
-      - name: Assemble debug APK
-        run: |
-          set -o pipefail
-          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee /tmp/gradle-build.log || {
-            echo "::error::$(base64 -w0 /tmp/gradle-build.log)"
-            exit 1
-          }
       - name: Pre-fetch Robolectric android-all runtimes
         run: |
           set -euo pipefail
@@ -168,13 +185,22 @@ jobs:
             echo "::error::$(base64 -w0 /tmp/gradle-test.log)"
             exit 1
           }
-      - name: Run lint (non-blocking — abortOnError=false)
-        run: ./gradlew --no-daemon :app:lintDebug || true
-      - name: Upload lint report
-        uses: actions/upload-artifact@v4
+      - name: Capture CI renders (diagnostic only, no commit, restores goldens)
         if: always()
+        run: |
+          set -e
+          ./gradlew --no-daemon :app:recordPaparazziDebug --tests "com.raijin.app.PreferencesPaparazziTest" || true
+          mkdir -p /tmp/ci-renders
+          cp app/src/test/snapshots/images/com.raijin.app_PreferencesPaparazziTest_*.png /tmp/ci-renders/ 2>/dev/null || true
+          git checkout -- app/src/test/snapshots/images/ || true
+          cd /tmp/ci-renders && for f in *.png; do
+            python3 -c "import struct,sys; d=open('$f','rb').read(33); w,h=struct.unpack('>II', d[16:24]); print(f'$f {w}x{h}')"
+          done
+      - name: Upload CI preference renders (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: lint-report
-          path: app/build/reports/lint-results-debug.html
+          name: ci-preferences-renders
+          path: /tmp/ci-renders/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 14
