@@ -10,9 +10,10 @@ import org.junit.Test
 /** ME-5 goldens: preferences card, quiet hours off and on. */
 class PreferencesPaparazziTest {
 
-    // Taller frame so the card with provider ordering is captured in full.
+    // Frame tall enough for the full card incl. Protected paths + Provider order
+    // (1400 clipped the lower sections; 2400 leaves headroom, image bottom is empty background).
     @get:Rule
-    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 1400))
+    val paparazzi = Paparazzi(deviceConfig = DeviceConfig.PIXEL_5.copy(screenHeight = 2400))
 
     @Test
     fun preferencesCardQuietHoursOff() {
