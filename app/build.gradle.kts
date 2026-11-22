@@ -104,6 +104,16 @@ android {
     lint {
         // F0: permissive; tightened in F4 after device validation on iQOO Z9s.
         abortOnError = false
+        // KNOWN UPSTREAM ISSUE: lint analysis intermittently crashes on
+        // Kotlin 2.1.0 bytecode with "Provided Metadata instance has version
+        // 2.1.0, while maximum supported version is 2.0.0" (kotlinx-metadata
+        // bundled with lint caps at 2.0.0; crashes in lint's metadata
+        // reading, e.g. ComposableCoroutineCreationDetector). Also crashed
+        // at lint 8.8.0 via android.experimental.lint.version (probe
+        // reverted); intermittent on bundled lint (run 45048052106 passed).
+        // Upstream: https://issuetracker.google.com/issues/386304679
+        // Accepted: when it crashes, analysis is incomplete for that run;
+        // no detector suppression.
     }
 }
 
