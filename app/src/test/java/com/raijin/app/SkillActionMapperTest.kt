@@ -30,6 +30,6 @@ class SkillActionMapperTest {
         assertEquals("MUSIC_CONTROL", SkillActionMapper.forDescription("pause the music"))
         assertEquals("MUSIC_CONTROL", SkillActionMapper.forDescription("silence everything"))
         assertEquals("CALL_CONTACT", SkillActionMapper.forDescription("call mom"))
-        assertEquals("CREATE_REMINDER", SkillActionMapper.forDescription("remind me to call"))
+        assertEquals("CREATE_REMINDER", SkillActionMapper.forDescription("remind me to stretch"))
     }
 }
