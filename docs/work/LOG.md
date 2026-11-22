@@ -1,0 +1,43 @@
+# LOG — session history
+
+## 2026-11-23 (00:30–01:20 IST) — Instinct overnight session
+
+**Changed**
+- 621fb9c: ME-1 Room migration path test (v2→9 and v4→9, seeded data survives,
+  Room validates final schema); ST-3 DuplicateDetector in brain-core
+  (size → 64KiB-edge hash → full hash funnel, 7 tests); docs/work/STATUS.md
+  created (full PRD verification map).
+- 7e5f8bd: NT-2 ProactiveNotificationParser — 11 new tests pinned and fixed
+  three defects: "tomorrow at 5 pm" ignored "tomorrow" when a clock time
+  matched; bare numbers like "28" in due dates became hour 28 and rolled
+  Calendar leniently into garbage times; bare numbers now lose to
+  meridiem/colon-marked candidates (strong/weak ranking). CI: brain-core XML
+  test-count summary added to the test job (zero-test guard), matching the
+  app job's evidence standard.
+- c2d01b0: NT-4 SuggestionTrustLadder in brain-core (7 tests, unwired per
+  M2 gate — pure logic only).
+- This file + DEVICE_TESTS.md; STATUS.md updated for NT-2/TM-7/NT-4.
+
+**Verified (CI runs, both jobs green)**
+- 45059108399 (621fb9c): app XML 170/0 failures; migration + duplicate tests green.
+- 45060961984 (7e5f8bd): app XML 182/0; brain-core XML 439/0 (first counted).
+- c2d01b0 run pending at log time.
+
+**NOT verified**: everything Android-facing remains device-unverified
+(nothing has run on the iQOO Z9s). Lint crashes intermittently with the
+known upstream Kotlin-metadata bug (issuetracker 386304679), non-blocking.
+
+**Surfaced for owner/main decision**
+- NT-4 wiring: NotificationListenerService auto-creates reminders from
+  parsed notifications today, with no suggestion step. The ladder is ready;
+  wiring it changes live behavior → owner's call (asked via main).
+- TM-7 undo chip: missing. Needs an additive brain-contract field, HUD
+  Compose chip, and NEW Paparazzi goldens (new baselines need approval
+  before recording).
+- BR-9 conversation history: absent end-to-end (single-prompt port).
+  Wiring it would send prior turns to the cloud → egress implications, so
+  design first.
+
+**Next**
+- Owner decision on NT-4 wiring, then TM-7 undo chip (needs golden
+  approval), then BR-9 design.

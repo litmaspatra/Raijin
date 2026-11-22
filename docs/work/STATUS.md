@@ -58,7 +58,7 @@ steps run by the owner.
 | TM-4 | P0 | partial | reminder engine + `ReminderBroadcastReceiver` | Exact-alarm runtime prompt unaudited |
 | TM-5 | P0 | build-verified | `ReminderRearmReceiver` | Boot/timezone re-arm device-only |
 | TM-6 | P0 | build-verified | receiver + notification path | Spoken context line unaudited |
-| TM-7 | P0 | partial | — | Undo chip unaudited |
+| TM-7 | P0 | partial | `RaijinBrainTest` cancel/list rows | Cancel/list unit-verified; 5 s undo chip MISSING (needs additive contract field + HUD chip + new goldens) |
 | TM-8 | P1 | unit-verified | `ReminderRecurrenceTest` | |
 | TM-9 | P1 | partial | `ProactiveNotificationParser` | Conditional reminder wiring unaudited |
 | MU-1 | P0 | unit-verified | `MusicLibraryIndexTest`, `LocalMusicProvider` | |
@@ -75,9 +75,9 @@ steps run by the owner.
 | ST-5/6/7 | P1 | intentionally disabled | `StorageDeletionDisabledTest` | Deletion disabled at all layers (2026-11-22 privacy repair); re-enable is an owner decision |
 | ST-8 | P1 | partial | — | Storage voice phrases unaudited |
 | NT-1 | P1 | unit-verified | `NotificationCountTest`, `NotificationSummaryTest` | Retention/ring buffer unaudited |
-| NT-2 | P1 | partial | `ProactiveNotificationParser` | Classifier coverage unaudited |
+| NT-2 | P1 | unit-verified | `ProactiveNotificationParserTest` (2026-11-23) | 11 tests; fixed tomorrow+time, invalid-hour rollover, strong/weak candidate ranking |
 | NT-3 | P1 | partial | — | Suggestion chip unaudited |
-| NT-4 | P1 | missing | — | Trust ladder |
+| NT-4 | P1 | unit-verified (logic) | `SuggestionTrustLadderTest` (2026-11-23) | Ladder unwired: current service auto-creates with no suggestion step; wiring is the owner's decision |
 | NT-5 | P1 | partial | local buffer exists | Voice answers unaudited |
 | SK-1 | P1 | unit-verified | `SkillValidatorTest`, `SkillJsonParserTest` | Unknown action = validation error, fail closed |
 | SK-2 | P1 | unit-verified | `SkillInstallServiceTest`, `SkillFetcherTest`, `SkillRunLogDaoTest` | |
