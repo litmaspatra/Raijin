@@ -67,6 +67,24 @@ jobs:
         # Scoped to :brain-contract and :brain-core (pure Kotlin, tests run without Android SDK)
         # --configure-on-demand avoids configuring :app (requires Android SDK) on this runner
         run: ./gradlew --no-daemon --configure-on-demand :brain-contract:build :brain-core:build
+      - name: Summarize brain-core test results (XML counts)
+        # Same evidence standard as the app job: XML counts, not task success
+        # alone. A task that ran zero tests is a broken signal, not a green one.
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          tests=fails=errs=skip=0
+          files=glob.glob('brain-core/build/test-results/test/*.xml')
+          for f in files:
+              r=ET.parse(f).getroot()
+              tests+=int(r.get('tests',0)); fails+=int(r.get('failures',0))
+              errs+=int(r.get('errors',0)); skip+=int(r.get('skipped',0))
+          print(f"brain-core XML: files={len(files)} tests={tests} failures={fails} errors={errs} skipped={skip}")
+          if tests==0:
+              print("::error::zero brain-core tests recorded in XML - treating as broken signal")
+              sys.exit(1)
+          PY
       - name: Test Phase 1D measurement harness
         run: python -m unittest discover -s scripts/phase1d -p "test_*.py" -v
       - name: Test Phase 0B unit suite

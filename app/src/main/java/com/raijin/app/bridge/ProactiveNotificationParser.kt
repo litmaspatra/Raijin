@@ -72,20 +72,36 @@ object ProactiveNotificationParser {
         }
 
         // Check absolute clock time e.g. "at 5:30 pm"
+        val hasTomorrow = lower.contains("tomorrow")
         val timeMatcher = TIME_REGEX.matcher(lower)
         var triggerEpochMs = nowMs + (3600_000L * 2) // default 2 hours from now
-        var foundTime = false
+
+        // Strong candidates carry a meridiem or explicit :MM minutes; bare
+        // numbers ("gate 9", "28/11") are weak fallbacks used only when no
+        // strong candidate exists.
+        var strongCal: Calendar? = null
+        var weakCal: Calendar? = null
 
         while (timeMatcher.find()) {
             val hourStr = timeMatcher.group(1) ?: continue
-            val minStr = timeMatcher.group(2) ?: "0"
+            val minStr = timeMatcher.group(2)
             val ampm = timeMatcher.group(3)?.lowercase()
 
             var hour = hourStr.toIntOrNull() ?: continue
-            val minute = minStr.toIntOrNull() ?: 0
+            val minute = minStr?.toIntOrNull() ?: 0
 
-            if (ampm == "pm" && hour in 1..11) hour += 12
-            if (ampm == "am" && hour == 12) hour = 0
+            // Fail safe on non-clock numbers ("due 28/11", "seat 45A"): a bare
+            // number is a clock hour only in 0..23, a meridiem hour in 1..12,
+            // minutes always 0..59. Otherwise keep looking, never roll the
+            // calendar over leniently into a garbage reminder.
+            if (minute !in 0..59) continue
+            if (ampm != null) {
+                if (hour !in 1..12) continue
+                if (ampm == "pm" && hour != 12) hour += 12
+                if (ampm == "am" && hour == 12) hour = 0
+            } else if (hour !in 0..23) {
+                continue
+            }
 
             val cal = Calendar.getInstance().apply {
                 timeInMillis = nowMs
@@ -93,26 +109,36 @@ object ProactiveNotificationParser {
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
-                // If the time already passed today, assume tomorrow
-                if (timeInMillis <= nowMs) {
+                if (hasTomorrow) {
+                    // "meeting tomorrow at 5 pm" means tomorrow even when the
+                    // same clock time is still ahead today.
+                    add(Calendar.DAY_OF_YEAR, 1)
+                } else if (timeInMillis <= nowMs) {
+                    // If the time already passed today, assume tomorrow
                     add(Calendar.DAY_OF_YEAR, 1)
                 }
             }
-            triggerEpochMs = cal.timeInMillis
-            foundTime = true
-            break
+            val strong = ampm != null || minStr != null
+            if (strong) {
+                if (strongCal == null) strongCal = cal
+            } else if (weakCal == null) {
+                weakCal = cal
+            }
         }
 
-        // If it mentions "tomorrow", add 1 day
-        if (lower.contains("tomorrow") && !foundTime) {
-            val cal = Calendar.getInstance().apply {
+        val chosen = strongCal ?: weakCal
+        if (chosen != null) {
+            triggerEpochMs = chosen.timeInMillis
+        } else if (hasTomorrow) {
+            // "tomorrow" without a clock time defaults to 9 AM
+            triggerEpochMs = Calendar.getInstance().apply {
                 timeInMillis = nowMs
                 add(Calendar.DAY_OF_YEAR, 1)
-                set(Calendar.HOUR_OF_DAY, 9) // Default 9 AM tomorrow
+                set(Calendar.HOUR_OF_DAY, 9)
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)
-            }
-            triggerEpochMs = cal.timeInMillis
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
         }
 
         return DetectedEvent(
