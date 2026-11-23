@@ -135,6 +135,14 @@ class RaijinService : Service() {
             val svc = instance ?: return
             svc.handleProactiveEvent(title, category)
         }
+
+        /** NT-3: queue a suggestion chip for a low-importance/low-confidence event. */
+        fun notifyProactiveSuggestion(id: String, event: com.raijin.app.bridge.DetectedEvent) {
+            val svc = instance ?: return
+            svc.handleProactiveSuggestion(id, event)
+        }
+
+        private const val ACTION_PROACTIVE_SUGGESTION = "PROACTIVE_SUGGESTION"
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -738,6 +746,65 @@ class RaijinService : Service() {
         }
     }
 
+    /**
+     * NT-3/NT-4: a low-importance or low-confidence notification event shows
+     * as a silent suggestion chip (no TTS: it was not important enough to
+     * interrupt). Confirm creates the reminder; dismiss drops it. If another
+     * suggestion is already queued, the next chip surfaces after this one
+     * resolves.
+     */
+    private fun handleProactiveSuggestion(suggestionId: String, event: com.raijin.app.bridge.DetectedEvent) {
+        serviceScope.launch {
+            _islandState.value = IslandState.NeedsInput(
+                label = "Reminder suggestion",
+                question = event.title,
+                context = "from your notifications",
+                confirmLabel = "Remind me",
+                cancelLabel = "Dismiss",
+                isDangerous = false,
+                traceId = suggestionId,
+                actionId = ACTION_PROACTIVE_SUGGESTION,
+            )
+        }
+    }
+
+    private fun onProactiveSuggestionAction(suggestionId: String, payload: String) {
+        serviceScope.launch {
+            val accepted = payload.equals("confirm", ignoreCase = true) || payload.equals("true", ignoreCase = true)
+            if (accepted) {
+                val event = com.raijin.app.bridge.PendingSuggestions.store.accept(suggestionId)
+                if (event != null) {
+                    runCatching {
+                        com.raijin.app.bridge.ProactiveReminderScheduler.schedule(
+                            applicationContext, event, "notification",
+                        )
+                    }.onSuccess {
+                        _islandState.value = IslandState.Done("Reminder set")
+                        tts.speak("Done, I'll remind you.")
+                    }.onFailure { e ->
+                        Log.e(TAG, "Accepted suggestion failed to schedule: ${e.message}", e)
+                        _islandState.value = IslandState.Failed("Couldn't set that reminder")
+                    }
+                } else {
+                    _islandState.value = IslandState.Failed("That suggestion expired")
+                }
+            } else {
+                com.raijin.app.bridge.PendingSuggestions.store.dismiss(suggestionId)
+                _islandState.value = IslandState.Idle
+            }
+            delay(2500L)
+            // Surface the next queued suggestion, if any; otherwise settle.
+            val next = com.raijin.app.bridge.PendingSuggestions.store.pendingIds().firstOrNull()
+            if (next != null) {
+                com.raijin.app.bridge.PendingSuggestions.store.peek(next)?.let { event ->
+                    handleProactiveSuggestion(next, event)
+                }
+            } else if (_islandState.value is IslandState.Done) {
+                _islandState.value = IslandState.Idle
+            }
+        }
+    }
+
     private fun runMorningBriefing() {
         serviceScope.launch {
             val localNow = java.time.ZonedDateTime.now()
@@ -1120,6 +1187,7 @@ class RaijinService : Service() {
                     "SKILL_ASK" -> {
                         if (payload.equals("cancel", ignoreCase = true)) skillAskBridge.cancel() else skillAskBridge.confirm()
                     }
+                    ACTION_PROACTIVE_SUGGESTION -> onProactiveSuggestionAction(traceId, payload)
                     "CONFIRM" -> brain.resolveActionConfirmation(traceId, payload.equals("true", ignoreCase = true) || payload.equals("confirm", ignoreCase = true))
                     "CHOICE" -> brain.resolveChoice(traceId, payload)
                     "CANCEL" -> brain.cancelCurrentAction(traceId)

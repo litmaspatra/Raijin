@@ -3,11 +3,23 @@ package com.raijin.app.bridge
 import java.util.Calendar
 import java.util.regex.Pattern
 
+/** Owner-confirmed importance mapping (2026-11-23): flights, bills and
+ *  meetings carry concrete external deadlines -> HIGH; the generic
+ *  reminder bucket -> LOW. */
+enum class EventImportance { HIGH, LOW }
+
+/** HIGH when the trigger came from an explicit time expression (relative
+ *  "in 30 mins", meridiem, or HH:MM); LOW for bare-number fallbacks and
+ *  defaults. */
+enum class EventConfidence { HIGH, LOW }
+
 data class DetectedEvent(
     val title: String,
     val triggerEpochMs: Long,
     val category: String,
     val rawText: String,
+    val importance: EventImportance,
+    val confidence: EventConfidence,
 )
 
 /**
@@ -55,6 +67,10 @@ object ProactiveNotificationParser {
             lower.contains("remind") || lower.contains("deadline") || lower.contains("don't forget") -> "REMINDER"
             else -> return null
         }
+        val importance = when (category) {
+            "FLIGHT", "BILL", "MEETING" -> EventImportance.HIGH
+            else -> EventImportance.LOW
+        }
 
         // Check relative time first e.g. "in 30 mins"
         val inMatcher = IN_TIME_REGEX.matcher(lower)
@@ -68,6 +84,8 @@ object ProactiveNotificationParser {
                 triggerEpochMs = triggerEpochMs,
                 category = category,
                 rawText = combined,
+                importance = importance,
+                confidence = EventConfidence.HIGH,
             )
         }
 
@@ -127,8 +145,10 @@ object ProactiveNotificationParser {
         }
 
         val chosen = strongCal ?: weakCal
+        val confidence: EventConfidence
         if (chosen != null) {
             triggerEpochMs = chosen.timeInMillis
+            confidence = if (strongCal != null) EventConfidence.HIGH else EventConfidence.LOW
         } else if (hasTomorrow) {
             // "tomorrow" without a clock time defaults to 9 AM
             triggerEpochMs = Calendar.getInstance().apply {
@@ -139,6 +159,9 @@ object ProactiveNotificationParser {
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
+            confidence = EventConfidence.LOW
+        } else {
+            confidence = EventConfidence.LOW
         }
 
         return DetectedEvent(
@@ -146,6 +169,8 @@ object ProactiveNotificationParser {
             triggerEpochMs = triggerEpochMs,
             category = category,
             rawText = combined,
+            importance = importance,
+            confidence = confidence,
         )
     }
 

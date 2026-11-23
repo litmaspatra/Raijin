@@ -145,4 +145,24 @@ class ProactiveNotificationParserTest {
         )
         assertTrue(e?.title?.startsWith("Flight Update:") == true)
     }
+
+    @Test
+    fun `owner-confirmed importance mapping`() {
+        // Flights, bills and meetings are high importance; the generic
+        // reminder bucket is low (owner decision 2026-11-23).
+        assertEquals(EventImportance.HIGH, ProactiveNotificationParser.parse("A", "flight at 6 pm", nowMs)?.importance)
+        assertEquals(EventImportance.HIGH, ProactiveNotificationParser.parse("B", "electricity bill due, pay by 5 pm", nowMs)?.importance)
+        assertEquals(EventImportance.HIGH, ProactiveNotificationParser.parse("C", "meeting at 3 pm", nowMs)?.importance)
+        assertEquals(EventImportance.LOW, ProactiveNotificationParser.parse("D", "don't forget the deadline tomorrow", nowMs)?.importance)
+    }
+
+    @Test
+    fun `confidence is high only for explicit time expressions`() {
+        // Relative and meridiem-marked times are high confidence.
+        assertEquals(EventConfidence.HIGH, ProactiveNotificationParser.parse("R", "call me in 30 mins about the meeting", nowMs)?.confidence)
+        assertEquals(EventConfidence.HIGH, ProactiveNotificationParser.parse("C", "interview at 5:30 pm", nowMs)?.confidence)
+        // Bare-number fallback and the no-time default are low confidence.
+        assertEquals(EventConfidence.LOW, ProactiveNotificationParser.parse("A", "flight AI 454 boarding at gate 9", nowMs)?.confidence)
+        assertEquals(EventConfidence.LOW, ProactiveNotificationParser.parse("T", "deadline tomorrow", nowMs)?.confidence)
+    }
 }

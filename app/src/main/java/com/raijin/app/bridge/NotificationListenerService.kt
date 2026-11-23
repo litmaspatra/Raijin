@@ -1,17 +1,9 @@
 package com.raijin.app.bridge
 
-import android.app.AlarmManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import com.raijin.app.RaijinDatabase
 import com.raijin.app.RaijinService
-import com.raijin.app.reminder.ReminderBroadcastReceiver
-import com.raijin.app.reminder.ReminderEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -174,37 +166,20 @@ class NotificationListenerService : NotificationListenerService() {
             }
         }
 
+        // NT-4 split (owner decision 2026-11-23): only high-importance AND
+        // high-confidence events auto-create. Anything lower waits as an
+        // island suggestion chip until the owner accepts it.
+        val autoCreate = detected.importance == EventImportance.HIGH &&
+            detected.confidence == EventConfidence.HIGH
+
+        if (!autoCreate) {
+            val id = PendingSuggestions.store.add(detected)
+            RaijinService.notifyProactiveSuggestion(id, detected)
+            return
+        }
+
         try {
-            val db = RaijinDatabase.getInstance(applicationContext)
-            val reminder = ReminderEntity(
-                text = detected.title,
-                triggerTime = detected.triggerEpochMs / 1000,
-                context = "Detected from $pkg: $text",
-                createdAt = System.currentTimeMillis() / 1000,
-            )
-
-            val id = db.reminderDao().upsert(reminder)
-
-            // Schedule exact alarm
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(this, ReminderBroadcastReceiver::class.java).apply {
-                setAction(ReminderBroadcastReceiver.ACTION_FIRE)
-                putExtra(ReminderBroadcastReceiver.EXTRA_REMINDER_ID, id)
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                this,
-                id.toInt(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, detected.triggerEpochMs, pendingIntent)
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, detected.triggerEpochMs, pendingIntent)
-            }
-
-            Log.i(TAG, "Proactively scheduled reminder '$detected.title' for epoch ${detected.triggerEpochMs}")
+            ProactiveReminderScheduler.schedule(applicationContext, detected, pkg)
 
             // Relay to HUD / TTS if RaijinService is running
             RaijinService.notifyProactiveEvent(detected.title, detected.category)
