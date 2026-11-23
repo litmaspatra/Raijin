@@ -83,6 +83,19 @@ sealed class IslandState {
     data class LongAnswer(
         val text: String,
     ) : IslandState()
+
+    /**
+     * TM-7: completed action with a live undo offer · green confirmation chip
+     * with an Undo button, auto-hides after [windowMs]. [undoToken] routes the
+     * tap back to the brain's one-shot undo store.
+     */
+    data class Undoable(
+        val label: String,
+        val undoToken: String,
+        val windowMs: Long,
+        val undoLabel: String = "Undo",
+        val actionId: String = "UNDO",
+    ) : IslandState()
 }
 
 // ── Width each state requests (dp) ──────────────────────────────────────
@@ -91,6 +104,7 @@ fun IslandState.targetWidthDp(): Int = when (this) {
     is IslandState.Idle          -> 88
     is IslandState.Listening     -> 200
     is IslandState.Done          -> if (label.length > 48) 310 else 180
+    is IslandState.Undoable      -> 310
     is IslandState.Resolving,
     is IslandState.Thinking,
     is IslandState.Acting,

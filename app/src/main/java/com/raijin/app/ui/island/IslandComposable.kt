@@ -91,6 +91,7 @@ fun IslandComposable(
             is IslandState.Acting        -> ActingContent(state)
             is IslandState.NeedsInput    -> NeedsInputContent(state, onAction)
             is IslandState.Done          -> DoneContent(state)
+            is IslandState.Undoable      -> UndoableContent(state, onAction)
             is IslandState.Failed        -> FailedContent(state)
             is IslandState.ProxyCall     -> ProxyCallContent(state)
             is IslandState.MorningBrief  -> MorningBriefContent(state)
@@ -303,6 +304,31 @@ private fun DoneContent(s: IslandState.Done) {
         if (s.label.length > 48) {
             Text("Tap to dismiss", fontSize = 11.sp, color = RaijinText)
         }
+    }
+}
+
+// ── Undoable: TM-7 post-creation undo chip ───────────────────────────────
+@Composable
+private fun UndoableContent(
+    s: IslandState.Undoable,
+    onAction: (String, String, String) -> Unit,
+) {
+    Column {
+        IslandLabel(text = "DONE · UNDO AVAILABLE", color = RaijinGreen)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = s.label,
+            color = RaijinWhite,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick  = { onAction("", s.actionId, s.undoToken) },
+            modifier = Modifier.fillMaxWidth(),
+            colors   = ButtonDefaults.outlinedButtonColors(contentColor = RaijinWhite),
+            border   = BorderStroke(1.dp, RaijinGreen),
+        ) { Text(s.undoLabel, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
     }
 }
 

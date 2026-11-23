@@ -58,7 +58,7 @@ steps run by the owner.
 | TM-4 | P0 | partial | reminder engine + `ReminderBroadcastReceiver` | Exact-alarm runtime prompt unaudited |
 | TM-5 | P0 | build-verified | `ReminderRearmReceiver` | Boot/timezone re-arm device-only |
 | TM-6 | P0 | build-verified | receiver + notification path | Spoken context line unaudited |
-| TM-7 | P0 | partial | `RaijinBrainTest` cancel/list rows | Cancel/list unit-verified; 5 s undo chip MISSING (needs additive contract field + HUD chip + new goldens) |
+| TM-7 | P0 | unit-verified | `RaijinBrainTest` cancel/list/undo rows, `BrainContractTest`, `UndoChipSnapshotTest` | 5s undo chip after voice-created reminders (2026-11-23): tap-only (voice "undo" future); proactive auto-schedule keeps Done flash; device flow unverified |
 | TM-8 | P1 | unit-verified | `ReminderRecurrenceTest` | |
 | TM-9 | P1 | partial | `ProactiveNotificationParser` | Conditional reminder wiring unaudited |
 | MU-1 | P0 | unit-verified | `MusicLibraryIndexTest`, `LocalMusicProvider` | |

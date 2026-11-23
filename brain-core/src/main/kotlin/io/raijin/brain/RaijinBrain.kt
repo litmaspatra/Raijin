@@ -21,6 +21,8 @@ import io.raijin.contract.MusicFeedback
 import io.raijin.contract.ProcessingMode
 import io.raijin.contract.RaijinBrainBridge
 import io.raijin.contract.RaijinMemoryPort
+import io.raijin.contract.UndoAction
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -51,6 +53,11 @@ class RaijinBrain(
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val actionLock = Any()
     private var actingTrace: String? = null
+
+    /** TM-7: one-shot undo offer, keyed by token; valid until expiresAtMs. */
+    private data class PendingUndo(val action: UndoAction, val expiresAtMs: Long)
+
+    private val pendingUndo = ConcurrentHashMap<String, PendingUndo>()
 
     /** AP-2: most recent app open, kept briefly so an explicit correction can teach an alias. */
     private var lastOpenedApp: LastOpenedApp? = null
@@ -616,6 +623,22 @@ class RaijinBrain(
         emit(IslandVisualState.Done("Cancelled."))
     }
 
+    override suspend fun resolveUndo(undoToken: String, accepted: Boolean) {
+        val undo = pendingUndo.remove(undoToken) ?: return
+        if (!accepted || System.currentTimeMillis() > undo.expiresAtMs) {
+            emit(IslandVisualState.Idle)
+            return
+        }
+        when (val outcome = actuator.undo(undo.action)) {
+            is ActionResult.EXECUTED ->
+                emit(IslandVisualState.Done(outcome.message ?: "Undone."))
+            is ActionResult.DENIED ->
+                emit(IslandVisualState.Failed(outcome.reason, recoverable = true))
+            is ActionResult.FAILED ->
+                emit(IslandVisualState.Failed(outcome.reason, recoverable = true))
+        }
+    }
+
     override fun submitContextUpdate(context: ActiveContext) {
         activeContext = context
     }
@@ -979,11 +1002,27 @@ class RaijinBrain(
                 return
             }
             when (actionResult) {
-                is ActionResult.EXECUTED -> emit(
-                    IslandVisualState.Done(
-                        feedbackLine = actionResult.message ?: result.vocalResponse ?: "Done.",
-                    ),
-                )
+                is ActionResult.EXECUTED -> {
+                    val feedback = actionResult.message ?: result.vocalResponse ?: "Done."
+                    val undo = actionResult.undoAction
+                    if (undo != null) {
+                        // TM-7: surface the undo chip instead of a plain Done.
+                        val token = UUID.randomUUID().toString()
+                        pendingUndo[token] = PendingUndo(
+                            action = undo,
+                            expiresAtMs = System.currentTimeMillis() + actionResult.undoWindowMs,
+                        )
+                        emit(
+                            IslandVisualState.Undoable(
+                                feedbackLine = feedback,
+                                undoToken = token,
+                                windowMs = actionResult.undoWindowMs,
+                            ),
+                        )
+                    } else {
+                        emit(IslandVisualState.Done(feedbackLine = feedback))
+                    }
+                }
                 is ActionResult.DENIED -> emit(
                     IslandVisualState.Failed(actionResult.reason, recoverable = true),
                 )

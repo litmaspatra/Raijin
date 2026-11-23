@@ -56,6 +56,22 @@ class IslandRenderTest {
         compose.setContent { RaijinTheme { IslandComposable(IslandState.Done("GST is a tax on goods and services. It combines central and state taxes. Businesses collect it on sales and claim credit for eligible purchases. Rates vary by category. Check the current rate before billing."), {}, { _, _, _ -> }) } }
         save("island-expanded")
     }
+    @Test fun undoableChip() {
+        compose.setContent {
+            RaijinTheme {
+                IslandComposable(
+                    IslandState.Undoable(
+                        label = "Reminder set for call Rahul.",
+                        undoToken = "token-fixture",
+                        windowMs = 5_000L,
+                    ),
+                    {},
+                    { _, _, _ -> },
+                )
+            }
+        }
+        save("island-undoable")
+    }
     @Test fun diagnostics() {
         compose.setContent {
             RaijinTheme {

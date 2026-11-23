@@ -31,6 +31,7 @@ import io.raijin.contract.ActuatorPort
 import io.raijin.contract.DispatchResult
 import io.raijin.contract.MessageChannel
 import io.raijin.contract.MusicCommand
+import io.raijin.contract.UndoAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -510,7 +511,35 @@ class AndroidActuator(
         ReminderBroadcastReceiver.scheduleAlarmCompat(alarmManager, triggerEpochMs, pendingIntent)
 
         Log.i(TAG, "Scheduled reminder '$args.title' for epoch $triggerEpochMs")
-        return ActionResult.EXECUTED()
+        // TM-7: creation is reversible within the undo window - delete the row
+        // and cancel the alarm if the owner taps Undo on the confirmation chip.
+        return ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(id))
+    }
+
+    /**
+     * TM-7: reverse an action that reported an undo offer. Unknown or
+     * unsupported undo kinds fail honestly instead of pretending.
+     */
+    override suspend fun undo(action: UndoAction): ActionResult = when (action) {
+        is UndoAction.DeleteReminder -> {
+            val dao = database.reminderDao()
+            val existing = dao.findById(action.reminderId)
+                ?: return ActionResult.FAILED("Reminder already gone")
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ReminderBroadcastReceiver::class.java).apply {
+                setAction(ReminderBroadcastReceiver.ACTION_FIRE)
+                putExtra(ReminderBroadcastReceiver.EXTRA_REMINDER_ID, action.reminderId)
+            }
+            val pi = PendingIntent.getBroadcast(
+                context, action.reminderId.toInt(), intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            alarmManager.cancel(pi)
+            pi.cancel()
+            dao.markFired(action.reminderId)
+            Log.i(TAG, "Undo: cancelled reminder ${action.reminderId} ('${existing.text}')")
+            ActionResult.EXECUTED("Undone: '${existing.text}' cancelled.")
+        }
     }
 
     // ── TM-2/TM-3: system Clock alarms and timers ─────────────────────────────

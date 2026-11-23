@@ -70,3 +70,21 @@ the importance rule proposal goes to the owner for confirmation first.
   the follow-up commit with these docs.
 - NOT verified: the whole chip flow on device (rendering, tap routing,
   alarm scheduling after accept) — JVM/build level only.
+
+## 2026-11-23 (23:00 IST) — TM-7 undo chip (branch tm7-undo-chip)
+
+- Voice-created reminders now offer a one-shot 5s undo: actuator returns
+  EXECUTED with UndoAction.DeleteReminder(id); brain emits
+  IslandVisualState.Undoable instead of Done; the island renders a green
+  DONE chip with an Undo control; accept runs ActuatorPort.undo (cancels
+  the alarm PendingIntent and marks the row fired - no Room schema change).
+- Additive contract: ActionResult.EXECUTED gains undoAction/undoWindowMs
+  (default 5000, PRD); sealed UndoAction; IslandVisualState.Undoable;
+  ActuatorPort.undo (default honest failure); bridge resolveUndo.
+- Behavioral scope (main-approved): voice-created reminders only; proactive
+  auto-schedule keeps its Done flash; tap-only, no "undo that" voice phrase
+  yet; one-shot token, expiry is a no-op to Idle.
+- Verified: UndoChipTest (6 tests) + BrainContractTest (2) at JVM level.
+  Golden for the new chip staged via PR failure artifact for owner-pixel
+  inspection BEFORE any baseline is recorded.
+- NOT verified: device rendering/tap/alarm cancellation on hardware.
