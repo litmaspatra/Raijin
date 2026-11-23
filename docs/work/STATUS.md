@@ -76,8 +76,8 @@ steps run by the owner.
 | ST-8 | P1 | partial | — | Storage voice phrases unaudited |
 | NT-1 | P1 | unit-verified | `NotificationCountTest`, `NotificationSummaryTest` | Retention/ring buffer unaudited |
 | NT-2 | P1 | unit-verified | `ProactiveNotificationParserTest` (2026-11-23) | 11 tests; fixed tomorrow+time, invalid-hour rollover, strong/weak candidate ranking |
-| NT-3 | P1 | partial | — | Suggestion chip unaudited |
-| NT-4 | P1 | owner-decided | — | Owner (2026-11-23): NO 3-accept ladder (code removed same day). Split, mapping CONFIRMED by owner: FLIGHT/BILL/MEETING = high importance (auto-create when high-confidence); generic REMINDER = low (suggest-first chip). Chip UI (NT-3) not built; split enables only after it lands |
+| NT-3 | P1 | unit-verified (logic) | `PendingSuggestionStoreTest` (2026-11-23) | Chip reuses the existing NeedsInput island flow (no new goldens needed); tap-only, voice accept future; store/TTL/queue JVM-tested |
+| NT-4 | P1 | unit-verified (logic) | `ProactiveNotificationParserTest`, `PendingSuggestionStoreTest` (2026-11-23) | Owner-confirmed split WIRED: FLIGHT/BILL/MEETING = high importance; explicit times = high confidence; high+high auto-creates, else silent island chip. Device flow unverified |
 | NT-5 | P1 | partial | local buffer exists | Voice answers unaudited |
 | SK-1 | P1 | unit-verified | `SkillValidatorTest`, `SkillJsonParserTest` | Unknown action = validation error, fail closed |
 | SK-2 | P1 | unit-verified | `SkillInstallServiceTest`, `SkillFetcherTest`, `SkillRunLogDaoTest` | |

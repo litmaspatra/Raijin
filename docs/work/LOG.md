@@ -50,3 +50,23 @@ low-confidence events become suggest-first chips. SuggestionTrustLadder and
 its tests REMOVED (dead code after the decision). Importance mapping and
 the NT-3 chip UI are the remaining work, planned for tonight's session;
 the importance rule proposal goes to the owner for confirmation first.
+
+## 2026-11-23 (22:00 IST) — NT-3 chip + NT-4 split landed
+
+- 12bcd9f: DetectedEvent gains importance (owner-confirmed map:
+  FLIGHT/BILL/MEETING high) and confidence (explicit time expressions high;
+  bare-number fallbacks and defaults low). NotificationListenerService
+  auto-creates only high+high; lower events queue in PendingSuggestionStore
+  (12h TTL) and surface as silent island chips reusing the existing
+  NeedsInput confirm/cancel flow — no new goldens needed. Accept schedules
+  via the extracted ProactiveReminderScheduler (shared with auto-create);
+  dismiss drops; the next queued chip surfaces after each resolve. Chips
+  are tap-only and silent (no TTS) by design: low-importance events should
+  not interrupt. Voice acceptance is future work.
+- Verified: parser importance/confidence pinned by 2 new test groups;
+  store by 4 tests. First CI run (45221499003) RED on my own test bug —
+  assertNull(message, actual) args reversed at two call sites in
+  PendingSuggestionStoreTest (compileDebugUnitTestKotlin error); fixed in
+  the follow-up commit with these docs.
+- NOT verified: the whole chip flow on device (rendering, tap routing,
+  alarm scheduling after accept) — JVM/build level only.

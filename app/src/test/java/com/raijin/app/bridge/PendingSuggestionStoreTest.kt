@@ -24,7 +24,7 @@ class PendingSuggestionStoreTest {
     fun `accept consumes the suggestion exactly once`() {
         val id = store.add(event("vague deadline"))
         assertEquals("vague deadline", store.accept(id)?.title)
-        assertNull(store.accept(id), "second accept must find nothing")
+        assertNull("second accept must find nothing", store.accept(id))
     }
 
     @Test
@@ -46,7 +46,7 @@ class PendingSuggestionStoreTest {
     fun `expired suggestions prune`() {
         val id = store.add(event("stale"))
         now += 13 * 3600_000L // beyond the 12h TTL
-        assertNull(store.accept(id), "expired suggestion must not schedule a reminder")
+        assertNull("expired suggestion must not schedule a reminder", store.accept(id))
         assertTrue(store.pendingIds().isEmpty())
     }
 }
