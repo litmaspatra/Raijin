@@ -206,6 +206,21 @@ jobs:
         # single-Cancel clarification state. Fails on any rendering or
         # geometry regression.
         run: ./gradlew --no-daemon :app:verifyPaparazziDebug
+      # TEMPORARY (TM-7 golden recording, PR #1 only - remove before merge):
+      # record the approved UndoChip baseline with the same renderer verify
+      # uses, then upload it for commit. Runs even though the verify above
+      # fails while the baseline is absent.
+      - name: Record approved UndoChip golden
+        if: always()
+        run: ./gradlew --no-daemon :app:recordPaparazziDebug
+      - name: Upload recorded UndoChip golden
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tm7-recorded-golden
+          path: app/src/test/snapshots/images/com.raijin.app.ui.island_UndoChipSnapshotTest_*.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload UI-5 snapshot failure report
         if: failure()
         uses: actions/upload-artifact@v4
