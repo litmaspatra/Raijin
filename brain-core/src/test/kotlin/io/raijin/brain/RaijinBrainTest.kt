@@ -1868,7 +1868,7 @@ class UndoChipTest {
         brain.processUtterance("remind me to play cricket at 6 pm", "undo-accept")
         val token = assertIs<IslandVisualState.Undoable>(brain.islandState.value).undoToken
         brain.resolveUndo(token, accepted = true)
-        assertEquals(listOf(UndoAction.DeleteReminder(42L)), actuator.undoCalls)
+        assertEquals(UndoAction.DeleteReminder(42L), actuator.undoCalls.single())
         assertIs<IslandVisualState.Done>(brain.islandState.value)
     }
 
