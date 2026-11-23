@@ -46,13 +46,13 @@ class NotificationListenerService : NotificationListenerService() {
             val postTimeMs: Long,
         )
 
-        private const val MAX_CACHED = 60
+        /** NT-1: ring buffer (60) + 7-day retention, JVM-tested in NotificationCacheTest. */
+        private val activeCache = NotificationCache<CachedNotification>(postedAtMs = { it.postTimeMs })
 
-        private val activeMessages = java.util.concurrent.ConcurrentHashMap<String, CachedNotification>()
         @Volatile var listenerConnected: Boolean = false
             private set
         val cachedUnread: Map<String, Int>
-            get() = activeMessages.values.groupingBy { it.pkg }.eachCount()
+            get() = activeCache.values().groupingBy { it.pkg }.eachCount()
 
         /** Packages never summarized: Raijin itself and the system UI. */
         private val EXCLUDED_PACKAGES = setOf("com.raijin.app", "com.android.systemui", "android")
@@ -62,7 +62,7 @@ class NotificationListenerService : NotificationListenerService() {
          * sanitized snippet (null when every body is suppressed).
          */
         val cachedAppDigests: List<io.raijin.brain.BriefingText.AppDigest>
-            get() = activeMessages.values
+            get() = activeCache.values()
                 .groupBy { it.pkg }
                 .map { (_, list) ->
                     val newest = list.maxByOrNull { it.postTimeMs }
@@ -122,14 +122,16 @@ class NotificationListenerService : NotificationListenerService() {
             extraction != null -> extraction to io.raijin.brain.BriefingText.SummaryKind.EXTRACTION
             else -> sanitized to io.raijin.brain.BriefingText.SummaryKind.PREVIEW
         }
-        activeMessages[sbn.key] = CachedNotification(
-            pkg = sbn.packageName,
-            appLabel = resolveAppLabel(sbn.packageName),
-            snippet = snippet,
-            kind = kind,
-            postTimeMs = sbn.postTime,
+        activeCache.put(
+            sbn.key,
+            CachedNotification(
+                pkg = sbn.packageName,
+                appLabel = resolveAppLabel(sbn.packageName),
+                snippet = snippet,
+                kind = kind,
+                postTimeMs = sbn.postTime,
+            ),
         )
-        evictOverflow()
     }
 
     private fun resolveAppLabel(pkg: String): String = try {
@@ -140,17 +142,8 @@ class NotificationListenerService : NotificationListenerService() {
         pkg
     }
 
-    private fun evictOverflow() {
-        if (activeMessages.size <= MAX_CACHED) return
-        val overflow = activeMessages.size - MAX_CACHED
-        activeMessages.entries
-            .sortedBy { it.value.postTimeMs }
-            .take(overflow)
-            .forEach { activeMessages.remove(it.key, it.value) }
-    }
-
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        activeMessages.remove(sbn.key)
+        activeCache.remove(sbn.key)
     }
 
     private suspend fun handleProactivePerception(title: String, text: String, pkg: String) {
@@ -190,7 +183,7 @@ class NotificationListenerService : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
-        activeMessages.clear()
+        activeCache.clear()
         try {
             activeNotifications?.forEach { sbn -> cacheNotification(sbn) }
             listenerConnected = true
@@ -202,7 +195,7 @@ class NotificationListenerService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         listenerConnected = false
-        activeMessages.clear()
+        activeCache.clear()
         Log.w(TAG, "Notification listener disconnected")
     }
 }
