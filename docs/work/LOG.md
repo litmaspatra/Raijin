@@ -88,3 +88,18 @@ the importance rule proposal goes to the owner for confirmation first.
   Golden for the new chip staged via PR failure artifact for owner-pixel
   inspection BEFORE any baseline is recorded.
 - NOT verified: device rendering/tap/alarm cancellation on hardware.
+
+## 2026-11-24 (00:30 IST) — AP-7 accessibility safety policy
+
+- New brain-core A11ySafetyPolicy: denylist (UPI/payment/banking, password
+  managers/authenticators, system installers), irreversible-label confirm
+  gate (send/post/pay/delete/submit + Hindi labels), payments blocked
+  outright (no confirmation unlocks). Package prefix matching, fail closed.
+- Wired as the chokepoint in RaijinAccessibilityService: denied packages'
+  events are ignored; the WhatsApp Send tap is CONFIRM_REQUIRED satisfied
+  by the owner-confirmed PendingSend (brain SEND_MESSAGE confirmation
+  remains the confirmation point - behavior unchanged).
+- No payment ActionType exists, so voice "pay X" has no execution path
+  (fail-closed by absence). AP-6 loop will route through this policy.
+- Verified: A11ySafetyPolicyTest (10 tests) JVM-level. NOT verified:
+  on-device refusal behavior.

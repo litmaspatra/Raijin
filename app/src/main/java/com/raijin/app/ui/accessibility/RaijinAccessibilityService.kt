@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
+import io.raijin.brain.a11y.A11ySafetyPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -171,8 +172,18 @@ class RaijinAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
 
-        // Only react to WhatsApp events.
         val pkg = event.packageName?.toString() ?: return
+
+        // AP-7: hard safety rules run before anything else. A denied package
+        // (payments/banking, credentials, system installers) is never acted
+        // on - no pending state can unlock it.
+        val (pkgVerdict, reason) = A11ySafetyPolicy.packageVerdict(pkg)
+        if (pkgVerdict == A11ySafetyPolicy.Verdict.DENIED) {
+            Log.w(TAG, "AP-7: ignoring events from denied package $pkg (${reason?.name})")
+            return
+        }
+
+        // Only react to WhatsApp events.
         if (pkg !in WHATSAPP_PACKAGES) return
 
         val pending = pendingSend ?: return
@@ -197,8 +208,22 @@ class RaijinAccessibilityService : AccessibilityService() {
 
         val sendNode = findSendButton(root)
         if (sendNode != null && sendNode.isClickable) {
+            // AP-7: "Send" is an irreversible action, so the policy requires
+            // confirmation. The confirmation IS the active PendingSend: it is
+            // only created after the brain's own owner confirmation for
+            // SEND_MESSAGE. Without it we would not be here at all.
+            val (verdict, _) = A11ySafetyPolicy.actionVerdict(
+                sendNode.packageName?.toString() ?: "",
+                sendNode.contentDescription?.toString() ?: "",
+            )
+            if (verdict == A11ySafetyPolicy.Verdict.DENIED) {
+                Log.w(TAG, "AP-7: send tap denied by policy")
+                sendNode.recycle()
+                root.recycle()
+                return
+            }
             val clicked = sendNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.d(TAG, "Send button found — click result: $clicked")
+            Log.d(TAG, "Send button found (policy: $verdict, confirmed via pending send) - click result: $clicked")
 
             if (clicked) {
                 completePendingSend(success = true)
