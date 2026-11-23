@@ -577,7 +577,13 @@ sealed interface IslandVisualState {
     data class Failed(
         val errorReason: String,
         val recoverable: Boolean,
-    ) : IslandVisualState
+    ) : IslandVisualState {
+        init {
+            // UI-3: every Failed state is spoken - a blank reason would be
+            // silently unspeakable, so it is rejected at construction.
+            require(errorReason.isNotBlank()) { "errorReason must not be blank" }
+        }
+    }
 
     data class Brief(
         val lines: List<String>,

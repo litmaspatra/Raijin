@@ -428,6 +428,8 @@ class RaijinService : Service() {
     fun startVoiceCapture() {
         if (!permissionBroker.canRecordAudio()) {
             _islandState.value = IslandState.Failed("Microphone permission required")
+            // UI-3: every Failed is spoken.
+            tts.speak("I need the microphone permission to hear you, boss.")
             val i = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
@@ -791,9 +793,13 @@ class RaijinService : Service() {
                     }.onFailure { e ->
                         Log.e(TAG, "Accepted suggestion failed to schedule: ${e.message}", e)
                         _islandState.value = IslandState.Failed("Couldn't set that reminder")
+                        // UI-3: every Failed is spoken.
+                        tts.speak("I couldn't set that reminder, boss.")
                     }
                 } else {
                     _islandState.value = IslandState.Failed("That suggestion expired")
+                    // UI-3: every Failed is spoken.
+                    tts.speak("That suggestion expired, boss.")
                 }
             } else {
                 com.raijin.app.bridge.PendingSuggestions.store.dismiss(suggestionId)

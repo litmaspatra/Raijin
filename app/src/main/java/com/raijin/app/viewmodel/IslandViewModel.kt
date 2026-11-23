@@ -139,7 +139,7 @@ class IslandViewModel @JvmOverloads constructor(
                     actionId     = obj.optString("actionId", ""),
                 )
                 "done"        -> IslandState.Done(label = obj.optString("label", "Done"))
-                "failed"      -> IslandState.Failed(reason = obj.optString("label", "Something went wrong"))
+                "failed"      -> IslandState.Failed(reason = obj.optString("label", "Something went wrong").ifBlank { "Something went wrong" })
                 "morning_brief" -> {
                     val linesArr = obj.optJSONArray("lines")
                     val lines = if (linesArr != null) {

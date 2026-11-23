@@ -11,7 +11,7 @@ steps run by the owner.
 |---|---|---|---|---|
 | UI-1 | P0 | build-verified | `hud/`, boot receivers | Reboot survival device-only |
 | UI-2 | P0 | unit-verified | `IslandRenderTest` | Reduce-Motion path unaudited |
-| UI-3 | P0 | partial | failure states exist in island VM | "Every Failed spoken" not asserted by a test |
+| UI-3 | P0 | unit-verified (contract) | `BrainContractTest.failedVisualStateRequiresASpeakableReason` (2026-11-24) | Blank failure reasons rejected at construction; full audit: 3 silent app-side Failed sites found and given spoken lines (mic permission, suggestion schedule failure, suggestion expired) |
 | UI-4 | P0 | build-verified | island composable gestures | |
 | UI-5 | P0 | unit-verified | `LongAnswerSnapshotTest`, `PreferencesPaparazziTest` | JVM render, goldens refreshed 2026-11-22 |
 | UI-6 | P1 | missing | — | No type-to-Raijin field |

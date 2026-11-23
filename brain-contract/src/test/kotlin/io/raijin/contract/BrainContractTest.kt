@@ -321,6 +321,16 @@ class BrainContractTest {
     }
 
     @Test
+    fun failedVisualStateRequiresASpeakableReason() {
+        // UI-3: every Failed is spoken, so a blank reason is rejected.
+        assertFailsWith<IllegalArgumentException> {
+            IslandVisualState.Failed(errorReason = "  ", recoverable = true)
+        }
+        val ok = IslandVisualState.Failed(errorReason = "No network.", recoverable = true)
+        assertEquals("No network.", ok.errorReason)
+    }
+
+    @Test
     fun undoableVisualStateRequiresContentAndWindow() {
         val state = IslandVisualState.Undoable(
             feedbackLine = "Reminder set for cricket.",
