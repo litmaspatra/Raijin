@@ -49,7 +49,7 @@ steps run by the owner.
 | AP-4 | P1 | build-verified | `ui/accessibility/` toggle surface | Refusal wording unaudited |
 | AP-5 | P1 | partial | `RaijinAccessibilityService` | Primitives inventory unaudited |
 | AP-6 | P1 | missing | — | See→decide→act loop |
-| AP-7 | P1 | missing | — | No denylist found in code |
+| AP-7 | P1 | unit-verified (policy) | `A11ySafetyPolicyTest` (2026-11-24) | Denylist + irreversible-action confirm + payments-blocked policy in brain-core, wired as the chokepoint in `RaijinAccessibilityService`; WhatsApp send unchanged (brain confirm = the confirmation). Device-level refusal unverified |
 | AP-8 | P1 | partial | `SessionTrustPolicy` + test (media analogue) | Screen-content egress consent unaudited |
 | AP-9 | P1 | build-verified | `OemSetupSection.kt` | |
 | TM-1 | P0 | unit-verified | `HinglishTimeParserTest` | 108 cases ≥ PRD's 100 |
