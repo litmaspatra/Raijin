@@ -41,6 +41,8 @@ fun IslandComposable(
     initialExpanded: Boolean = false,
     /** Test hook: hoisted scroll state for the long-answer card. */
     scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    /** UI-2: when true, no infinite/spring motion — snap changes only. */
+    reduceMotion: Boolean = ReduceMotion.rememberIsEnabled(),
 ) {
     val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
     val targetWidth = if (state is IslandState.Idle)
@@ -49,7 +51,8 @@ fun IslandComposable(
 
     val animWidth by animateDpAsState(
         targetValue = targetWidth,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = if (reduceMotion) snap()
+        else spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "island_width",
     )
 
@@ -78,16 +81,17 @@ fun IslandComposable(
             .border(hudBorder, shape)
             .clickable(onClick = onTap)
             .animateContentSize(
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)
+                animationSpec = if (reduceMotion) snap()
+                else spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)
             )
             .padding(horizontal = 14.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
         when (state) {
             is IslandState.Idle          -> IdleContent()
-            is IslandState.Listening     -> ListeningContent()
+            is IslandState.Listening     -> ListeningContent(reduceMotion)
             is IslandState.Resolving     -> ResolvingContent(state)
-            is IslandState.Thinking      -> ThinkingContent(state)
+            is IslandState.Thinking      -> ThinkingContent(state, reduceMotion)
             is IslandState.Acting        -> ActingContent(state)
             is IslandState.NeedsInput    -> NeedsInputContent(state, onAction)
             is IslandState.Done          -> DoneContent(state)
@@ -115,26 +119,36 @@ private fun IdleContent() {
 
 // ── Listening: Expanding tactical radar sweeps ─────────────────────────────
 @Composable
-private fun ListeningContent() {
-    val inf = rememberInfiniteTransition(label = "listen_radar")
-    val scale by inf.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = EaseInOutQuad),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "radar_scale",
-    )
-    val ringAlpha by inf.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 0.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = EaseInOutQuad),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "radar_alpha",
-    )
+private fun ListeningContent(reduceMotion: Boolean = false) {
+    // UI-2: static ring + dot when animations are removed.
+    val scale: Float
+    val ringAlpha: Float
+    if (reduceMotion) {
+        scale = 1f
+        ringAlpha = 0.6f
+    } else {
+        val inf = rememberInfiniteTransition(label = "listen_radar")
+        val s by inf.animateFloat(
+            initialValue = 0.7f,
+            targetValue = 1.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = EaseInOutQuad),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "radar_scale",
+        )
+        val a by inf.animateFloat(
+            initialValue = 0.9f,
+            targetValue = 0.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(800, easing = EaseInOutQuad),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "radar_alpha",
+        )
+        scale = s
+        ringAlpha = a
+    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Canvas(modifier = Modifier.size(16.dp)) {
@@ -182,17 +196,23 @@ private fun ResolvingContent(s: IslandState.Resolving) {
 
 // ── Thinking: Cybernetic telemetry calculation ─────────────────────────────
 @Composable
-private fun ThinkingContent(s: IslandState.Thinking) {
-    val inf = rememberInfiniteTransition(label = "thinking_arc")
-    val angle by inf.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "arc_spin",
-    )
+private fun ThinkingContent(s: IslandState.Thinking, reduceMotion: Boolean = false) {
+    // UI-2: static arc when animations are removed.
+    val angle: Float = if (reduceMotion) {
+        0f
+    } else {
+        val inf = rememberInfiniteTransition(label = "thinking_arc")
+        val a by inf.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "arc_spin",
+        )
+        a
+    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Canvas(modifier = Modifier.size(14.dp)) {

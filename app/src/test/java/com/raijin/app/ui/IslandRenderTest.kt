@@ -72,6 +72,18 @@ class IslandRenderTest {
         }
         save("island-undoable")
     }
+    @Test fun listeningReduceMotion() {
+        compose.setContent {
+            RaijinTheme { IslandComposable(IslandState.Listening, {}, { _, _, _ -> }, reduceMotion = true) }
+        }
+        save("island-listening-reduced")
+    }
+    @Test fun thinkingReduceMotion() {
+        compose.setContent {
+            RaijinTheme { IslandComposable(IslandState.Thinking("Working on it"), {}, { _, _, _ -> }, reduceMotion = true) }
+        }
+        save("island-thinking-reduced")
+    }
     @Test fun diagnostics() {
         compose.setContent {
             RaijinTheme {
