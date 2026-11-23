@@ -21,7 +21,7 @@ class NotificationSummaryTest {
                 putString("android.text", text)
             }
         }
-        return StatusBarNotification(pkg, pkg, id, null, 0, 0, 0, n, UserHandle.getUserHandleForUid(0), 0)
+        return StatusBarNotification(pkg, pkg, id, null, 0, 0, 0, n, UserHandle.getUserHandleForUid(0), System.currentTimeMillis())
     }
 
     // ── sanitizer ─────────────────────────────────────────────────────────

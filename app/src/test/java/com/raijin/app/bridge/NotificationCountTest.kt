@@ -20,7 +20,7 @@ class NotificationCountTest {
             }
             if (summary) flags = flags or Notification.FLAG_GROUP_SUMMARY
         }
-        return StatusBarNotification("com.whatsapp", "com.whatsapp", id, null, 0, 0, 0, n, UserHandle.getUserHandleForUid(0), 0)
+        return StatusBarNotification("com.whatsapp", "com.whatsapp", id, null, 0, 0, 0, n, UserHandle.getUserHandleForUid(0), System.currentTimeMillis())
     }
     @Test fun repeatedUpdatesAreNotNewUnreadMessages() {
         val listener = NotificationListenerService()
