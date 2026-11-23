@@ -88,6 +88,27 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
                 alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerEpochMs, pendingIntent)
             }
         }
+
+        /**
+         * Cancel a reminder's scheduled alarm PendingIntent (same action,
+         * extra and request code used when scheduling). TM-7 and TM-9 share
+         * this path.
+         */
+        fun cancelAlarm(context: Context, reminderId: Long) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val intent = Intent(context, ReminderBroadcastReceiver::class.java).apply {
+                setAction(ACTION_FIRE)
+                putExtra(EXTRA_REMINDER_ID, reminderId)
+            }
+            val pi = android.app.PendingIntent.getBroadcast(
+                context,
+                reminderId.toInt(),
+                intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+            )
+            alarmManager.cancel(pi)
+            pi.cancel()
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -115,6 +136,17 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
                 val db = RaijinDatabase.getInstance(context)
                 val reminder = db.reminderDao().findById(reminderId)
                 if (reminder != null) {
+                    // TM-9: final 30-minute check window for conditional
+                    // reminders — a recent reply suppresses the fire quietly.
+                    if (reminder.conditionWatchMode == "AUTO" && reminder.conditionContact != null) {
+                        val lastReply = com.raijin.app.bridge.NotificationListenerService
+                            .recentTitleAt(reminder.conditionContact)
+                        if (ConditionalReminderPolicy.shouldSuppressFire(lastReply, System.currentTimeMillis())) {
+                            db.reminderDao().markFired(reminderId)
+                            Log.i(TAG, "Conditional reminder $reminderId suppressed: reply within window")
+                            return@launch
+                        }
+                    }
                     db.reminderDao().markFired(reminderId)
                     showNotification(context, reminder)
                     ActionExecutor.tts?.speak("Reminder: ${reminder.text}")

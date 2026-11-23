@@ -1921,3 +1921,53 @@ class UndoChipTest {
         assertIs<IslandVisualState.Failed>(brain.islandState.value)
     }
 }
+
+/**
+ * TM-9: conditional reminders ("remind me if Rahul doesn't reply by 6 pm")
+ * parse into a CREATE_REMINDER carrying a structured ConditionWatch; plain
+ * reminders stay unconditional.
+ */
+class ConditionalReminderTest {
+
+    @Test
+    fun conditionalReplyReminderCarriesConditionWatch() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        val res = brain.processUtterance("remind me if Rahul doesn't reply by 6 pm", "trace-cond")
+        assertEquals(ActionType.CREATE_REMINDER, res.actionType)
+        val args = assertIs<ActionArgs.Reminder>(res.args)
+        assertEquals(ActionArgs.ConditionWatch("Rahul"), args.conditionWatch)
+        assertEquals("if Rahul doesn't reply", args.condition)
+        assertTrue(args.triggerAtEpochMillis > System.currentTimeMillis())
+        assertEquals(1, actuator.actions.size)
+    }
+
+    @Test
+    fun conditionalVariantsParse() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        listOf(
+            "remind me if Amma does not reply by 9 pm" to "Amma",
+            "remind me if Priya didn't reply till 8 pm" to "Priya",
+        ).forEachIndexed { i, (utterance, contact) ->
+            val res = brain.processUtterance(utterance, "trace-cond-$i")
+            assertEquals(ActionType.CREATE_REMINDER, res.actionType, utterance)
+            val args = assertIs<ActionArgs.Reminder>(res.args)
+            assertEquals(ActionArgs.ConditionWatch(contact), args.conditionWatch, utterance)
+        }
+    }
+
+    @Test
+    fun plainReminderStaysUnconditional() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        val res = brain.processUtterance("remind me to call Rahul at 6 pm", "trace-plain")
+        assertEquals(ActionType.CREATE_REMINDER, res.actionType)
+        val args = assertIs<ActionArgs.Reminder>(res.args)
+        assertNull(args.conditionWatch)
+        assertNull(args.condition)
+    }
+}

@@ -51,6 +51,10 @@ data class ReminderEntity(
     @ColumnInfo(name = "condition_watch_mode")
     val conditionWatchMode: String = "NONE",
 
+    /** TM-9: contact whose reply satisfies an AUTO condition watch. */
+    @ColumnInfo(name = "condition_contact")
+    val conditionContact: String? = null,
+
     /** 0 = pending, 1 = fired (or cancelled). */
     val fired: Int = 0,
 

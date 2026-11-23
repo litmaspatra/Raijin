@@ -60,7 +60,7 @@ steps run by the owner.
 | TM-6 | P0 | build-verified | receiver + notification path | Spoken context line unaudited |
 | TM-7 | P0 | unit-verified | `RaijinBrainTest` cancel/list/undo rows, `BrainContractTest`, `UndoChipSnapshotTest` | 5s undo chip after voice-created reminders (2026-11-23): tap-only (voice "undo" future); proactive auto-schedule keeps Done flash; device flow unverified |
 | TM-8 | P1 | unit-verified | `ReminderRecurrenceTest` | |
-| TM-9 | P1 | partial | `ProactiveNotificationParser` | Conditional reminder wiring unaudited |
+| TM-9 | P1 | unit-verified | `ConditionalReminderTest`, `BrainContractTest`, `ConditionMatcherTest`, `ConditionalReminderPolicyTest` | Conditional reminders (2026-11-24): structured ConditionWatch, event-driven cancel on reply + 30-min fire-time check, quiet island chip; English-only phrase pattern; reply titles kept in-memory only; device flow unverified |
 | MU-1 | P0 | unit-verified | `MusicLibraryIndexTest`, `LocalMusicProvider` | |
 | MU-2 | P0 | unit-verified (logic) | `MediaSessionLogicTest`, `MediaSessionCommander` | Real app sessions device-only |
 | MU-4 | P0 | unit-verified (logic) | `MediaSessionLogicTest`, `SessionTrustPolicyTest` | |

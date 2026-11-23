@@ -142,6 +142,12 @@ class RaijinService : Service() {
             svc.handleProactiveSuggestion(id, event)
         }
 
+        /** TM-9: quiet island flash (no TTS), e.g. a conditional reminder cancelled on reply. */
+        fun showIslandInfo(text: String) {
+            val svc = instance ?: return
+            svc.showQuietInfo(text)
+        }
+
         private const val ACTION_PROACTIVE_SUGGESTION = "PROACTIVE_SUGGESTION"
     }
 
@@ -737,6 +743,17 @@ class RaijinService : Service() {
     }
 
     // ── Proactive Sentinel & Morning Briefing ────────────────────────────────
+
+    /** TM-9: silent Done flash, no TTS (conditional reminder cancelled). */
+    private fun showQuietInfo(text: String) {
+        serviceScope.launch {
+            _islandState.value = IslandState.Done(text)
+            delay(2500L)
+            if (_islandState.value is IslandState.Done) {
+                _islandState.value = IslandState.Idle
+            }
+        }
+    }
 
     private fun handleProactiveEvent(title: String, category: String) {
         // ME-5: quiet hours silence proactive speaking.
