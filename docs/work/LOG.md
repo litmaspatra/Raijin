@@ -103,3 +103,17 @@ the importance rule proposal goes to the owner for confirmation first.
   (fail-closed by absence). AP-6 loop will route through this policy.
 - Verified: A11ySafetyPolicyTest (10 tests) JVM-level. NOT verified:
   on-device refusal behavior.
+
+## 2026-11-24 (00:55 IST) — UI-3 every-Failed-spoken hardening
+
+- Contract: IslandVisualState.Failed now requires a non-blank errorReason
+  (a blank reason would be silently unspeakable). Audited all 17 brain-side
+  constructions - all non-blank by construction (literals or
+  contract-guaranteed DENIED/FAILED reasons).
+- App-side audit found THREE silent Failed sites, two of them mine from the
+  NT-3 work earlier tonight: mic-permission refusal, suggestion schedule
+  failure, suggestion expired. Each got a short spoken line per UI-3.
+- Defensive: IslandViewModel JSON "failed" mapping defaults a blank label.
+  IslandState.Failed itself NOT require-hardened: some app-side reasons are
+  dynamic and cannot all be statically proven non-blank - noted honestly.
+- Verified: new contract test + audit. NOT device-verified.
