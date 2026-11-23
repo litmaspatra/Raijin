@@ -189,6 +189,13 @@ private fun IslandVisualState.toIslandState(): IslandState = when (this) {
 
     is IslandVisualState.Done   -> IslandState.Done(label = feedbackLine)
 
+    is IslandVisualState.Undoable -> IslandState.Undoable(
+        label     = feedbackLine,
+        undoToken = undoToken,
+        windowMs  = windowMs,
+        undoLabel = undoLabel,
+    )
+
     is IslandVisualState.Failed -> IslandState.Failed(reason = errorReason)
 
     // Brief has no app-local counterpart yet (PRD §5 — MorningBrief parked).

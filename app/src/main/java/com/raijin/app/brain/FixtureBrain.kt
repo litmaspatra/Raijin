@@ -72,6 +72,10 @@ class FixtureBrain : RaijinBrainBridge {
         // No-op for F0 fixture brain.
     }
 
+    override suspend fun resolveUndo(undoToken: String, accepted: Boolean) {
+        // No-op for F0 fixture brain.
+    }
+
     override fun submitContextUpdate(context: ActiveContext) {
         // No-op for F0 fixture brain.
     }

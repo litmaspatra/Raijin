@@ -386,10 +386,22 @@ sealed interface ActionResult {
      * The action completed. [message], when present, overrides the dispatch's
      * pre-set vocal response - used when the real outcome is only known at
      * actuation time (e.g. MU-2 now-playing answers with the actual track).
+     *
+     * TM-7: [undoAction], when present, offers a one-shot undo for [undoWindowMs]
+     * after completion. The brain surfaces it as [IslandVisualState.Undoable];
+     * the actuator must be able to reverse the action via [ActuatorPort.undo].
      */
     data class EXECUTED(
         val message: String? = null,
-    ) : ActionResult
+        val undoAction: UndoAction? = null,
+        val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
+    ) : ActionResult {
+        init {
+            require(undoAction == null || undoWindowMs > 0) {
+                "undo window must be positive when an undo action is offered"
+            }
+        }
+    }
 
     data class DENIED(
         val reason: String,
@@ -406,10 +418,33 @@ sealed interface ActionResult {
             require(reason.isNotBlank()) { "failure reason must not be blank" }
         }
     }
+
+    companion object {
+        /** TM-7: PRD-mandated undo window after creation actions. */
+        const val DEFAULT_UNDO_WINDOW_MS = 5_000L
+    }
+}
+
+/**
+ * TM-7: a reversible-effect handle returned by an actuator so the owner can
+ * undo a just-completed action within its window. Pure data - the reversal
+ * itself runs through [ActuatorPort.undo].
+ */
+sealed interface UndoAction {
+    /** Delete (mark fired/cancelled) the reminder created with this row id. */
+    data class DeleteReminder(val reminderId: Long) : UndoAction
 }
 
 interface ActuatorPort {
     suspend fun execute(action: DispatchResult): ActionResult
+
+    /**
+     * TM-7: reverse an action previously reported as [ActionResult.EXECUTED]
+     * with an [ActionResult.EXECUTED.undoAction]. Default reports an honest
+     * failure so existing actuators stay valid without undo support.
+     */
+    suspend fun undo(action: UndoAction): ActionResult =
+        ActionResult.FAILED("This action cannot be undone.")
 }
 
 data class CapabilitySnapshot(
@@ -520,6 +555,25 @@ sealed interface IslandVisualState {
         val feedbackLine: String,
     ) : IslandVisualState
 
+    /**
+     * TM-7: a completed action whose effect can still be undone. Behaves like
+     * [Done] but carries a one-shot [undoToken] for [RaijinBrainBridge.resolveUndo]
+     * and auto-hides after [windowMs].
+     */
+    data class Undoable(
+        val feedbackLine: String,
+        val undoToken: String,
+        val windowMs: Long,
+        val undoLabel: String = "Undo",
+    ) : IslandVisualState {
+        init {
+            require(feedbackLine.isNotBlank()) { "feedbackLine must not be blank" }
+            require(undoToken.isNotBlank()) { "undoToken must not be blank" }
+            require(windowMs > 0) { "undo window must be positive" }
+            require(undoLabel.isNotBlank()) { "undoLabel must not be blank" }
+        }
+    }
+
     data class Failed(
         val errorReason: String,
         val recoverable: Boolean,
@@ -547,6 +601,13 @@ interface RaijinBrainBridge {
     suspend fun resolveChoice(traceId: String, optionId: String)
 
     suspend fun resolveClarification(traceId: String, answer: String)
+
+    /**
+     * TM-7: resolve a pending [IslandVisualState.Undoable]. [accepted] = true
+     * runs the reversal through the actuator; false dismisses. An unknown or
+     * expired token is a no-op that returns the island to idle.
+     */
+    suspend fun resolveUndo(undoToken: String, accepted: Boolean)
 
     suspend fun cancelCurrentAction(traceId: String)
 

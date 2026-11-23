@@ -310,15 +310,22 @@ class RaijinService : Service() {
                     tts.speak(visualState.feedbackLine)
                 }
 
+                // TM-7: the undo chip replaces Done, so it keeps the spoken confirmation.
+                if (visualState is IslandVisualState.Undoable && visualState.feedbackLine.isNotBlank()) {
+                    tts.speak(visualState.feedbackLine)
+                }
+
                 // PRD UI-3: never silent. Every Failed state is also spoken, one short line.
                 if (visualState is IslandVisualState.Failed && visualState.errorReason.isNotBlank()) {
                     tts.speak(visualState.errorReason)
                 }
 
-                if (uiState is IslandState.Done || uiState is IslandState.Failed) {
+                if (uiState is IslandState.Done || uiState is IslandState.Failed || uiState is IslandState.Undoable) {
                     val delayMs = when (uiState) {
                         is IslandState.Done   -> uiState.autoHideMs
                         is IslandState.Failed -> uiState.autoHideMs
+                        // TM-7: the chip lives exactly as long as the undo offer.
+                        is IslandState.Undoable -> uiState.windowMs
                         else -> 2500L
                     }
                     serviceScope.launch {
@@ -1188,6 +1195,8 @@ class RaijinService : Service() {
                         if (payload.equals("cancel", ignoreCase = true)) skillAskBridge.cancel() else skillAskBridge.confirm()
                     }
                     ACTION_PROACTIVE_SUGGESTION -> onProactiveSuggestionAction(traceId, payload)
+                    // TM-7: payload carries the one-shot undo token.
+                    "UNDO" -> brain.resolveUndo(payload, accepted = true)
                     "CONFIRM" -> brain.resolveActionConfirmation(traceId, payload.equals("true", ignoreCase = true) || payload.equals("confirm", ignoreCase = true))
                     "CHOICE" -> brain.resolveChoice(traceId, payload)
                     "CANCEL" -> brain.cancelCurrentAction(traceId)
@@ -1227,6 +1236,12 @@ class RaijinService : Service() {
                 IslandState.Done(label = vs.feedbackLine)
             }
         is IslandVisualState.Failed -> IslandState.Failed(reason = vs.errorReason)
+        is IslandVisualState.Undoable -> IslandState.Undoable(
+            label = vs.feedbackLine,
+            undoToken = vs.undoToken,
+            windowMs = vs.windowMs,
+            undoLabel = vs.undoLabel,
+        )
         is IslandVisualState.Brief -> IslandState.MorningBrief(lines = vs.lines)
     }
 
@@ -1236,6 +1251,7 @@ class RaijinService : Service() {
         when (state) {
             is IslandState.Idle,
             is IslandState.Done,
+            is IslandState.Undoable,
             is IslandState.LongAnswer,
             is IslandState.Failed -> releaseWakeLock()
             else                  -> acquireWakeLock()

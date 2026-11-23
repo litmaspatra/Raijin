@@ -20,6 +20,7 @@ import io.raijin.contract.MessageChannel
 import io.raijin.contract.MusicCommand
 import io.raijin.contract.MusicFeedback
 import io.raijin.contract.RaijinMemoryPort
+import io.raijin.contract.UndoAction
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -1826,5 +1827,97 @@ class ContactCorrectionRecordingTest {
         val args = assertIs<ActionArgs.Music>(res.args)
         assertEquals(MusicCommand.PLAY_QUERY, args.command)
         assertEquals("something by arijit", args.query)
+    }
+}
+
+
+class UndoChipTest {
+
+    private class UndoRecordingActuator(
+        private val executeResult: ActionResult,
+        private val undoResult: ActionResult = ActionResult.EXECUTED("Undone."),
+    ) : ActuatorPort {
+        val undoCalls = mutableListOf<UndoAction>()
+
+        override suspend fun execute(action: io.raijin.contract.DispatchResult): ActionResult = executeResult
+
+        override suspend fun undo(action: UndoAction): ActionResult {
+            undoCalls += action
+            return undoResult
+        }
+    }
+
+    @Test
+    fun `TM-7 undo-offering EXECUTED emits Undoable instead of Done`() = runTest {
+        val actuator = UndoRecordingActuator(
+            ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(42L)),
+        )
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "undo-emit")
+        val state = brain.islandState.value
+        assertIs<IslandVisualState.Undoable>(state)
+        assertEquals(ActionResult.DEFAULT_UNDO_WINDOW_MS, state.windowMs)
+    }
+
+    @Test
+    fun `TM-7 accepting undo runs the actuator reversal and confirms`() = runTest {
+        val actuator = UndoRecordingActuator(
+            ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(42L)),
+        )
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "undo-accept")
+        val token = assertIs<IslandVisualState.Undoable>(brain.islandState.value).undoToken
+        brain.resolveUndo(token, accepted = true)
+        assertEquals(UndoAction.DeleteReminder(42L), actuator.undoCalls.single())
+        assertIs<IslandVisualState.Done>(brain.islandState.value)
+    }
+
+    @Test
+    fun `TM-7 dismissing undo runs nothing and returns to idle`() = runTest {
+        val actuator = UndoRecordingActuator(
+            ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(42L)),
+        )
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "undo-dismiss")
+        val token = assertIs<IslandVisualState.Undoable>(brain.islandState.value).undoToken
+        brain.resolveUndo(token, accepted = false)
+        assertTrue(actuator.undoCalls.isEmpty())
+        assertIs<IslandVisualState.Idle>(brain.islandState.value)
+    }
+
+    @Test
+    fun `TM-7 undo token is one-shot`() = runTest {
+        val actuator = UndoRecordingActuator(
+            ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(42L)),
+        )
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "undo-once")
+        val token = assertIs<IslandVisualState.Undoable>(brain.islandState.value).undoToken
+        brain.resolveUndo(token, accepted = true)
+        brain.resolveUndo(token, accepted = true)
+        assertEquals(1, actuator.undoCalls.size)
+        assertIs<IslandVisualState.Done>(brain.islandState.value)
+    }
+
+    @Test
+    fun `TM-7 plain EXECUTED without undo offer still emits Done`() = runTest {
+        val actuator = UndoRecordingActuator(ActionResult.EXECUTED())
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "no-undo")
+        assertIs<IslandVisualState.Done>(brain.islandState.value)
+        assertTrue(actuator.undoCalls.isEmpty())
+    }
+
+    @Test
+    fun `TM-7 failed reversal surfaces an honest failure`() = runTest {
+        val actuator = UndoRecordingActuator(
+            executeResult = ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(42L)),
+            undoResult = ActionResult.FAILED("Reminder already gone"),
+        )
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        brain.processUtterance("remind me to play cricket at 6 pm", "undo-fail")
+        val token = assertIs<IslandVisualState.Undoable>(brain.islandState.value).undoToken
+        brain.resolveUndo(token, accepted = true)
+        assertIs<IslandVisualState.Failed>(brain.islandState.value)
     }
 }

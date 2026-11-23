@@ -305,4 +305,39 @@ class BrainContractTest {
         }
     }
 
+    @Test
+    fun undoOfferDefaultsAndValidation() {
+        // No undo: default window is inert and no offer is carried.
+        val plain = ActionResult.EXECUTED()
+        assertEquals(null, plain.undoAction)
+
+        val offered = ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(7L))
+        assertEquals(ActionResult.DEFAULT_UNDO_WINDOW_MS, offered.undoWindowMs)
+
+        // An offer with a non-positive window is rejected.
+        assertFailsWith<IllegalArgumentException> {
+            ActionResult.EXECUTED(undoAction = UndoAction.DeleteReminder(7L), undoWindowMs = 0L)
+        }
+    }
+
+    @Test
+    fun undoableVisualStateRequiresContentAndWindow() {
+        val state = IslandVisualState.Undoable(
+            feedbackLine = "Reminder set for cricket.",
+            undoToken = "token-1",
+            windowMs = 5_000L,
+        )
+        assertEquals("Undo", state.undoLabel)
+
+        assertFailsWith<IllegalArgumentException> {
+            IslandVisualState.Undoable(feedbackLine = " ", undoToken = "t", windowMs = 5_000L)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            IslandVisualState.Undoable(feedbackLine = "ok", undoToken = "", windowMs = 5_000L)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            IslandVisualState.Undoable(feedbackLine = "ok", undoToken = "t", windowMs = 0L)
+        }
+    }
+
 }
