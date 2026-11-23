@@ -489,6 +489,9 @@ class AndroidActuator(
             triggerTime = triggerEpochMs / 1000,
             recurrenceRule = args.recurrenceRule,
             condition = args.condition,
+            // TM-9: a watched condition arms AUTO cancellation on reply.
+            conditionWatchMode = if (args.conditionWatch != null) "AUTO" else "NONE",
+            conditionContact = args.conditionWatch?.contactName,
             createdAt = System.currentTimeMillis() / 1000,
         )
 

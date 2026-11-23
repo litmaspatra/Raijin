@@ -322,6 +322,11 @@ class RaijinBrain(
                         HinglishTimeParser.Recurrence.WEEKLY -> " Har hafte isi din yaad dilaunga."
                         HinglishTimeParser.Recurrence.NONE -> ""
                     }
+                    // TM-9: a conditional reminder is cancelled early if the
+                    // watched contact replies; otherwise it fires at the deadline.
+                    val conditionalNote = intent.conditionWatchContact?.let {
+                        " I'll watch for $it's reply."
+                    } ?: ""
                     val result = DispatchResult(
                         traceId = traceId,
                         actionType = ActionType.CREATE_REMINDER,
@@ -334,10 +339,14 @@ class RaijinBrain(
                                 HinglishTimeParser.Recurrence.WEEKLY -> "WEEKLY"
                                 HinglishTimeParser.Recurrence.NONE -> null
                             },
+                            condition = intent.conditionWatchContact?.let { "if $it doesn't reply" },
+                            conditionWatch = intent.conditionWatchContact?.let {
+                                ActionArgs.ConditionWatch(contactName = it)
+                            },
                         ),
                         confidence = 0.95f,
                         risk = ActionRisk.LOW,
-                        vocalResponse = "Reminder set for ${intent.title}.$recurringNote",
+                        vocalResponse = "Reminder set for ${intent.title}.$recurringNote$conditionalNote",
                     )
                     execute(result)
                     result
@@ -1217,6 +1226,8 @@ private sealed interface ParsedIntent {
         val title: String,
         val triggerAtEpochMillis: Long,
         val recurrence: HinglishTimeParser.Recurrence = HinglishTimeParser.Recurrence.NONE,
+        /** TM-9: contact whose reply cancels this reminder, when conditional. */
+        val conditionWatchContact: String? = null,
     ) : ParsedIntent
 
     data object CleanStorage : ParsedIntent
@@ -1701,6 +1712,12 @@ private object ReflexParser {
     )
     private val hindiReminderMarkers = listOf(" yaad dilana", " yaad dila dena", " yaad dila do")
 
+    /** TM-9: "if <name> doesn't reply by <time>" inside a reminder request. */
+    private val conditionalReplyRegex = Regex(
+        """if\s+([A-Za-z][A-Za-z .'-]{0,40}?)\s+(?:doesn't|does not|didn't|did not)\s+reply\s+(?:by|till|before)\s+(.+)""",
+        setOf(RegexOption.IGNORE_CASE),
+    )
+
     /** Removes the words that carried the date-time meaning from the title. */
     private fun stripTimeFragment(title: String, fragment: String): String {
         var t = title
@@ -1738,6 +1755,20 @@ private object ReflexParser {
             return null
         }
         if (body.isNullOrBlank()) return null
+
+        // TM-9: "remind me if <name> doesn't reply by <time>" — the reply
+        // cancels the reminder; the time is the fallback deadline.
+        conditionalReplyRegex.find(body)?.let { m ->
+            val contact = m.groupValues[1].trim()
+            val timePart = m.groupValues[2].trim()
+            val parsed = HinglishTimeParser.parse(timePart, now) ?: return null
+            return ParsedIntent.Reminder(
+                title = "$contact hasn't replied",
+                triggerAtEpochMillis = parsed.triggerAt.toInstant().toEpochMilli(),
+                recurrence = parsed.recurrence,
+                conditionWatchContact = contact,
+            )
+        }
 
         val parsed = HinglishTimeParser.parse(body, now) ?: return null
         val title = stripTimeFragment(body, parsed.matchedFragment)

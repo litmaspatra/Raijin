@@ -3,6 +3,7 @@ package com.raijin.app.bridge
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.raijin.app.RaijinDatabase
 import com.raijin.app.RaijinService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +78,42 @@ class NotificationListenerService : NotificationListenerService() {
 
         /** Cache of recently scheduled event titles to prevent duplicate reminders */
         private val recentEventTitles = mutableSetOf<String>()
+
+        /**
+         * TM-9: rolling record of watched-channel notification titles and when
+         * they arrived (normalized title -> last seen ms). Feeds both the
+         * event-driven conditional cancel and the receiver's fire-time check.
+         * In-memory only; rebuilt as notifications arrive.
+         */
+        private val recentWatchedTitles = java.util.concurrent.ConcurrentHashMap<String, Long>()
+        private const val MAX_RECENT_TITLES = 200
+        private const val RECENT_TITLE_TTL_MS = 24 * 3600_000L
+
+        /**
+         * TM-9: last time a watched-channel title matching [contactName] was
+         * seen, or null. Used by ReminderBroadcastReceiver at fire time.
+         */
+        fun recentTitleAt(contactName: String): Long? {
+            val c = ConditionMatcher.normalize(contactName)
+            return recentWatchedTitles.entries
+                .firstOrNull { (title, _) -> ConditionMatcher.matches(title, c) }
+                ?.value
+        }
+
+        private fun recordWatchedTitle(title: String) {
+            val now = System.currentTimeMillis()
+            recentWatchedTitles[ConditionMatcher.normalize(title)] = now
+            if (recentWatchedTitles.size > MAX_RECENT_TITLES) {
+                val cutoff = now - RECENT_TITLE_TTL_MS
+                recentWatchedTitles.entries.removeIf { it.value < cutoff }
+                if (recentWatchedTitles.size > MAX_RECENT_TITLES) {
+                    recentWatchedTitles.entries
+                        .sortedBy { it.value }
+                        .take(recentWatchedTitles.size - MAX_RECENT_TITLES)
+                        .forEach { recentWatchedTitles.remove(it.key, it.value) }
+                }
+            }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -88,9 +125,30 @@ class NotificationListenerService : NotificationListenerService() {
 
         // Proactive detection stays limited to watched communication channels.
         if (sbn.packageName in WATCHED_PACKAGES && title.isNotBlank()) {
+            recordWatchedTitle(title)
             serviceScope.launch {
+                checkConditionalReminders(title)
                 handleProactivePerception(title, text, sbn.packageName)
             }
+        }
+    }
+
+    /**
+     * TM-9: a reply from a watched contact cancels pending conditional
+     * reminders for that contact: alarm cancelled, row marked fired, quiet
+     * island flash (no TTS). On-device only.
+     */
+    private suspend fun checkConditionalReminders(title: String) {
+        val db = RaijinDatabase.getInstance(applicationContext)
+        val pending = db.reminderDao().findConditional()
+        for (r in pending) {
+            val contact = r.conditionContact ?: continue
+            if (r.conditionWatchMode != "AUTO") continue
+            if (!ConditionMatcher.matches(title, contact)) continue
+            com.raijin.app.reminder.ReminderBroadcastReceiver.cancelAlarm(applicationContext, r.id)
+            db.reminderDao().markFired(r.id)
+            RaijinService.showIslandInfo("$contact replied — reminder cancelled")
+            Log.i(TAG, "Conditional reminder ${r.id} cancelled: $contact replied")
         }
     }
 

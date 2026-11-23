@@ -40,7 +40,7 @@ import com.raijin.app.skill.SkillRunLogEntity
         MemoryPatternEntity::class,
         InteractionLogEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class RaijinDatabase : RoomDatabase() {
@@ -236,9 +236,16 @@ abstract class RaijinDatabase : RoomDatabase() {
             }
         }
 
+        /** 9 -> 10: TM-9 adds reminders.condition_contact for conditional watches. */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reminders ADD COLUMN condition_contact TEXT")
+            }
+        }
+
         /** All migrations, exposed for migration-path tests. */
         internal val ALL_MIGRATIONS: Array<Migration> = arrayOf(
-            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
         )
 
         @Volatile private var INSTANCE: RaijinDatabase? = null

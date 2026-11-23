@@ -224,12 +224,26 @@ sealed interface ActionArgs {
         }
     }
 
+    /**
+     * TM-9: structured watch for a conditional reminder
+     * ("if Rahul doesn't reply by evening"). Matching runs on-device only
+     * against notification titles; notification text never leaves the phone.
+     */
+    data class ConditionWatch(
+        val contactName: String,
+    ) {
+        init {
+            require(contactName.isNotBlank()) { "condition watch contact must not be blank" }
+        }
+    }
+
     data class Reminder(
         val title: String,
         val triggerAtEpochMillis: Long,
         val timeZoneId: String,
         val recurrenceRule: String? = null,
         val condition: String? = null,
+        val conditionWatch: ConditionWatch? = null,
         val location: String? = null,
     ) : ActionArgs {
         init {

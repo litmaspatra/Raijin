@@ -257,6 +257,26 @@ class BrainContractTest {
     }
 
     @Test
+    fun reminderCarriesStructuredConditionWatch() {
+        val args = ActionArgs.Reminder(
+            title = "Rahul hasn't replied",
+            triggerAtEpochMillis = 1_800_000_000_000,
+            timeZoneId = "Asia/Kolkata",
+            condition = "if Rahul doesn't reply",
+            conditionWatch = ActionArgs.ConditionWatch(contactName = "Rahul"),
+        )
+
+        assertEquals(ActionArgs.ConditionWatch("Rahul"), args.conditionWatch)
+    }
+
+    @Test
+    fun conditionWatchRejectsBlankContact() {
+        assertFailsWith<IllegalArgumentException> {
+            ActionArgs.ConditionWatch(contactName = " ")
+        }
+    }
+
+    @Test
     fun briefRejectsBlankOrEmptyLines() {
         assertFailsWith<IllegalArgumentException> {
             IslandVisualState.Brief(emptyList())
