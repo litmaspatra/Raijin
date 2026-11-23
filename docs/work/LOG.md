@@ -41,3 +41,12 @@ known upstream Kotlin-metadata bug (issuetracker 386304679), non-blocking.
 **Next**
 - Owner decision on NT-4 wiring, then TM-7 undo chip (needs golden
   approval), then BR-9 design.
+
+## 2026-11-23 (09:47 IST) — owner NT-4 decision
+
+Owner decided (via main): no 3-accept trust ladder; auto-create stays for
+high-importance/high-confidence notification events, low-importance or
+low-confidence events become suggest-first chips. SuggestionTrustLadder and
+its tests REMOVED (dead code after the decision). Importance mapping and
+the NT-3 chip UI are the remaining work, planned for tonight's session;
+the importance rule proposal goes to the owner for confirmation first.

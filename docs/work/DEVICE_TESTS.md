@@ -50,7 +50,7 @@ note the row, what happened, and approximately what time.
 
 | # | Step | Expected |
 |---|---|---|
-| E1 | Receive a bill-style notification | Island suggests a reminder; NOTHING is auto-created (NT-3 — pending the owner's NT-4 decision; current build auto-creates, see STATUS.md) |
+| E1 | Receive a bill-style notification | High-importance/high-confidence: reminder auto-created. Low-importance/low-confidence: suggestion chip, nothing created until accepted (owner decision 2026-11-23; chip UI pending — current build auto-creates everything, see STATUS.md NT-4) |
 | E2 | "Kya notifications aaye?" | Answered locally, no network (NT-5) |
 
 ## F. Safety rails (M1/M2)

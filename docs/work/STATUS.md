@@ -77,7 +77,7 @@ steps run by the owner.
 | NT-1 | P1 | unit-verified | `NotificationCountTest`, `NotificationSummaryTest` | Retention/ring buffer unaudited |
 | NT-2 | P1 | unit-verified | `ProactiveNotificationParserTest` (2026-11-23) | 11 tests; fixed tomorrow+time, invalid-hour rollover, strong/weak candidate ranking |
 | NT-3 | P1 | partial | — | Suggestion chip unaudited |
-| NT-4 | P1 | unit-verified (logic) | `SuggestionTrustLadderTest` (2026-11-23) | Ladder unwired: current service auto-creates with no suggestion step; wiring is the owner's decision |
+| NT-4 | P1 | owner-decided | — | Owner (2026-11-23): NO 3-accept ladder (code removed same day). Split: high-importance/high-confidence auto-create; low -> suggest-first chips. Importance mapping pending owner confirm; chip UI (NT-3) not built |
 | NT-5 | P1 | partial | local buffer exists | Voice answers unaudited |
 | SK-1 | P1 | unit-verified | `SkillValidatorTest`, `SkillJsonParserTest` | Unknown action = validation error, fail closed |
 | SK-2 | P1 | unit-verified | `SkillInstallServiceTest`, `SkillFetcherTest`, `SkillRunLogDaoTest` | |
