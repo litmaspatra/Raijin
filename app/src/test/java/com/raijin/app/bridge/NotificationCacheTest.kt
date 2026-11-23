@@ -62,6 +62,17 @@ class NotificationCacheTest {
     }
 
     @Test
+    fun `entries posted after the wall clock are not pruned by clock skew`() {
+        // Fixtures (or a backwards device clock) can post times "in the future".
+        // Retention anchors to the newest post seen, so they survive.
+        val cache = newCache(max = 10)
+        now = 0 // wall clock far behind the fixture timeline
+        cache.put("a", Entry(posted = 100))
+        cache.put("b", Entry(posted = 200))
+        assertEquals(2, cache.size())
+    }
+
+    @Test
     fun `remove and clear behave`() {
         val cache = newCache(max = 10)
         cache.put("a", Entry(posted = now))

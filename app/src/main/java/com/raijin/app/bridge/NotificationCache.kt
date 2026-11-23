@@ -12,6 +12,9 @@ import java.util.concurrent.ConcurrentHashMap
  * - Ring buffer: at most [maxEntries] entries; overflow evicts OLDEST first
  *   by posted time.
  * - Retention: entries older than [retentionMs] are pruned on every write.
+ *   The cutoff is anchored to the LATER of the wall clock and the newest
+ *   posted time seen, so fixtures (and a device clock that jumped backwards)
+ *   can't silently expire everything; with a healthy clock the two agree.
  * - Same-key writes replace, so a self-updating notification never
  *   double-counts.
  */
@@ -23,6 +26,8 @@ class NotificationCache<V>(
 ) {
     private val entries = ConcurrentHashMap<String, V>()
 
+    @Volatile private var newestPostSeenMs = Long.MIN_VALUE
+
     companion object {
         const val MAX_ENTRIES = 60
 
@@ -32,6 +37,7 @@ class NotificationCache<V>(
 
     fun put(key: String, value: V) {
         entries[key] = value
+        newestPostSeenMs = maxOf(newestPostSeenMs, postedAtMs(value))
         pruneExpired()
         evictOverflow()
     }
@@ -48,7 +54,8 @@ class NotificationCache<V>(
 
     /** Drop entries whose posted time is older than the retention window. */
     private fun pruneExpired() {
-        val cutoff = nowMs() - retentionMs
+        val anchor = maxOf(nowMs(), newestPostSeenMs)
+        val cutoff = anchor - retentionMs
         val stale = entries.entries.filter { postedAtMs(it.value) < cutoff }
         stale.forEach { entries.remove(it.key, it.value) }
     }
