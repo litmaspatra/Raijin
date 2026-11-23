@@ -216,6 +216,10 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
             app/build/paparazzi/
+            # Robolectric IslandRenderTest renders (build/screenshots/*.png):
+            # the staging channel for owner-pixel inspection of NEW states
+            # before any Paparazzi baseline is recorded.
+            app/build/screenshots/
           if-no-files-found: warn
           retention-days: 14
       - name: Pre-fetch Robolectric android-all runtimes
