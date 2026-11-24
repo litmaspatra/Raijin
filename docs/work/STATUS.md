@@ -31,7 +31,7 @@ steps run by the owner.
 | BR-7 | P1 | partial | client exists | SSE streaming unaudited |
 | BR-8 | P1 | unit-verified | `SkillToolMapperTest` | Tool schema mapping; provider round-trip needs network |
 | BR-9 | P1 | partial | — | Rolling history unaudited |
-| BR-10 | P1 | partial | — | Persona-as-versioned-file unaudited |
+| BR-10 | P1 | unit-verified | `PersonaTest` (2026-11-24) | Persona prompt is `brain-core/resources/persona/system-prompt.v1.md` loaded via `Persona` (version marker enforced); wording change = new file version + VERSION bump; SkillAuthoringService's drafting prompt is a separate function and stays separate |
 | BR-11 | P1 | unit-verified | `EgressGateTest`, `ToolEgressPolicy` | L0/L1/L2 gate vs provider fake |
 | CT-1 | P0 | unit-verified | `RaijinDatabaseMigrationTest` (2026-11-23) | ContactEntity registered, real migrations tested |
 | CT-2 | P0 | unit-verified | `RelationshipAliasesTest`, `AliasMergeTest` | |
