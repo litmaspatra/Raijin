@@ -69,11 +69,11 @@ steps run by the owner.
 | MU-7 | P1 | unit-verified | `MusicTasteSamplerTest` | Acceptance rate is owner-measured, open |
 | MU-8 | P1 | unit-verified | `MU-8` parse tests in `RaijinBrainTest` + taste-model tests (2026-11-24) | "pasand aaya" → LIKED, "ye mat chalao" → DISLIKED (parsed before play-query so it is never shadowed), "aur aisa" → MORE_LIKE_THIS, each with common variants; actuation records a `MusicEvent` into `MusicTasteStore` immediately with honest failures when notification access is off or nothing is playing |
 | ST-1 | P1 | partial | All-files prompt deferred to first use | |
-| ST-2 | P1 | partial | `StorageAuditor` | Room index + WorkManager scan unaudited |
+| ST-2 | P1 | absent (audited 2026-11-24) | — | Legacy `StorageAuditor` is only an app-cache/log auditor; no Room file index, no WorkManager dependency in the app, no incremental mtime scan, no island progress, no charging constraint. Build pending; design fork (MediaStore-first vs wait for ST-1) is with the owner |
 | ST-3 | P1 | unit-verified | `DuplicateDetectorTest` (2026-11-23) | brain-core funnel: size → edge hash → full hash; no Android wiring yet (M2 gate) |
-| ST-4 | P1 | partial | — | Category taxonomy unaudited |
+| ST-4 | P1 | absent (audited 2026-11-24) | `DuplicateDetector` covers duplicates only | No category taxonomy (large files, old downloads, WhatsApp media, screenshots, APKs, empty folders, junk); classifier is brain-core pure work but its input shape depends on the ST-2 index design |
 | ST-5/6/7 | P1 | intentionally disabled | `StorageDeletionDisabledTest` | Deletion disabled at all layers (2026-11-22 privacy repair); re-enable is an owner decision |
-| ST-8 | P1 | partial | — | Storage voice phrases unaudited |
+| ST-8 | P1 | absent (audited 2026-11-24) | — | None of the PRD phrases parse ("storage kitni bachi hai", "duplicates hata do", "WhatsApp ka kachra saaf karo", "bade files dikhao"); only English "clean storage/cache/junk" exist (legacy auditor). Answers depend on ST-2/ST-4; "duplicates hata do" additionally needs the ST-5/6/7 owner decisions |
 | NT-1 | P1 | unit-verified | `NotificationCountTest`, `NotificationSummaryTest` | Retention/ring buffer unaudited |
 | NT-2 | P1 | unit-verified | `ProactiveNotificationParserTest` (2026-11-23) | 11 tests; fixed tomorrow+time, invalid-hour rollover, strong/weak candidate ranking |
 | NT-3 | P1 | unit-verified (logic) | `PendingSuggestionStoreTest` (2026-11-23) | Chip reuses the existing NeedsInput island flow (no new goldens needed); tap-only, voice accept future; store/TTL/queue JVM-tested |
