@@ -61,4 +61,34 @@ object BriefingText {
             (parts + coverage).filter { it.isNotBlank() }.joinToString(" ")
         }
     }
+
+    /**
+     * NT-5: answer an on-demand notification question ("kya notifications
+     * aaye?", "WhatsApp pe kisne bheja?") from the local buffer. Same
+     * honesty rules as the brief: names when access is off or the listener
+     * is disconnected, never pretends notifications are a complete unread
+     * count, and keeps suppressed bodies count-only.
+     */
+    fun notificationQueryAnswer(
+        accessGranted: Boolean,
+        connected: Boolean,
+        digests: List<AppDigest>,
+        appFilter: String?,
+    ): String {
+        if (!accessGranted) {
+            return "Notifications couldn't be checked. Notification access is off; enable it only if you want notification summaries."
+        }
+        if (!connected) {
+            return "Notifications couldn't be checked. The notification listener isn't connected yet."
+        }
+        if (appFilter == null) {
+            return notificationDigest(accessGranted, connected, digests)
+        }
+        val f = appFilter.trim().lowercase()
+        val matched = digests.filter { it.label.lowercase().contains(f) }
+        if (matched.isEmpty()) {
+            return "No active ${appFilter.trim()} notifications found. Messages without notifications aren't covered."
+        }
+        return notificationDigest(accessGranted, connected, matched)
+    }
 }

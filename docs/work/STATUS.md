@@ -78,7 +78,7 @@ steps run by the owner.
 | NT-2 | P1 | unit-verified | `ProactiveNotificationParserTest` (2026-11-23) | 11 tests; fixed tomorrow+time, invalid-hour rollover, strong/weak candidate ranking |
 | NT-3 | P1 | unit-verified (logic) | `PendingSuggestionStoreTest` (2026-11-23) | Chip reuses the existing NeedsInput island flow (no new goldens needed); tap-only, voice accept future; store/TTL/queue JVM-tested |
 | NT-4 | P1 | unit-verified (logic) | `ProactiveNotificationParserTest`, `PendingSuggestionStoreTest` (2026-11-23) | Owner-confirmed split WIRED: FLIGHT/BILL/MEETING = high importance; explicit times = high confidence; high+high auto-creates, else silent island chip. Device flow unverified |
-| NT-5 | P1 | partial | local buffer exists | Voice answers unaudited |
+| NT-5 | P1 | unit-verified | `NotificationQueryParseTest`, `NotificationQueryAnswerTest`, `BrainContractTest` (2026-11-24) | Voice notification questions answered locally from the listener buffer ("kya notifications aaye?", "WhatsApp pe kisne bheja?" + English variants) via existing READ_NOTIFICATIONS type; same honesty rules as the brief; device flow unverified |
 | SK-1 | P1 | unit-verified | `SkillValidatorTest`, `SkillJsonParserTest` | Unknown action = validation error, fail closed |
 | SK-2 | P1 | unit-verified | `SkillInstallServiceTest`, `SkillFetcherTest`, `SkillRunLogDaoTest` | |
 | SK-3 | P1 | unit-verified | `SkillDryRunTest`, `SkillAuthoringServiceTest`, `SkillInstallApprovalPaparazziTest` | |

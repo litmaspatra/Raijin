@@ -103,6 +103,7 @@ class AndroidActuator(
                 ActionType.SET_TIMER -> executeSetTimer(action)
                 ActionType.CANCEL_REMINDER -> executeCancelReminder(action)
                 ActionType.LIST_REMINDERS -> executeListReminders()
+                ActionType.READ_NOTIFICATIONS -> executeNotificationQuery(action)
                 ActionType.DISMISS_ALARM -> executeDismissAlarm(action)
                 ActionType.MUSIC_CONTROL -> executeMusicControl(action)
                 ActionType.MUSIC_FEEDBACK -> executeMusicFeedback(action)
@@ -673,6 +674,24 @@ class AndroidActuator(
         }
         val more = if (unfired.size > 5) " And ${unfired.size - 5} more." else ""
         speak("You have ${unfired.size} pending reminder(s). ${lines.joinToString(". ")}.$more")
+        return ActionResult.EXECUTED()
+    }
+
+    /**
+     * NT-5: answer a notification question locally from the listener buffer.
+     * Sanitized digests only; nothing leaves the device.
+     */
+    private fun executeNotificationQuery(action: DispatchResult): ActionResult {
+        val filter = (action.args as? ActionArgs.NotificationQuery)?.appFilter
+        val access = androidx.core.app.NotificationManagerCompat
+            .getEnabledListenerPackages(context).contains(context.packageName)
+        val answer = io.raijin.brain.BriefingText.notificationQueryAnswer(
+            access,
+            com.raijin.app.bridge.NotificationListenerService.listenerConnected,
+            com.raijin.app.bridge.NotificationListenerService.cachedAppDigests,
+            filter,
+        )
+        speak(answer)
         return ActionResult.EXECUTED()
     }
 
