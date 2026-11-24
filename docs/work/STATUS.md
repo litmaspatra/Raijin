@@ -16,9 +16,9 @@ steps run by the owner.
 | UI-5 | P0 | unit-verified | `LongAnswerSnapshotTest`, `PreferencesPaparazziTest` | JVM render, goldens refreshed 2026-11-22 |
 | UI-6 | P1 | missing | — | No type-to-Raijin field |
 | UI-7 | P1 | missing | — | No follow-up listen window |
-| UI-8 | P1 | partial | — | Tile/widget/share target unaudited |
+| UI-8 | P1 | absent (audited 2026-11-24) | — | No TileService, no AppWidget provider, no inbound share target in the manifest; existing ACTION_SEND code is outbound sharing only |
 | UI-9 | P2 | missing | — | Default-assistant role |
-| VO-1 | P0 | partial | `STTEngine`, `STTEngineRearmTest` | n-best alternatives routing unaudited |
+| VO-1 | P0 | unit-verified | `STTEngineRearmTest`, `IntentAlternativeResolverTest`, `ContactMatchingTest` (audited 2026-11-24) | n-best wired end to end: recognizer requests 5 alternatives, service routes them into utterance handling, app/contact resolution consumes `spokenAlternatives`; on-device STT itself remains held (STT Phase 1) |
 | VO-2 | P1 | pending-owner | — | On-device STT (STT Phase 1) parked on owner decision |
 | VO-3 | P1 | build-verified | TTS wiring exists | Voice tuning device-only |
 | VO-4 | P2 | missing | — | Wake word, needs battery numbers first |
@@ -27,8 +27,8 @@ steps run by the owner.
 | BR-3 | P0 | unit-verified | `ProviderFailoverPolicyTest` | Circuit breaker, Retry-After, 401/403 policy |
 | BR-4 | P0 | unit-verified | `ProviderFailoverPolicyTest` | ≤3 attempts, first-token budget |
 | BR-5 | P0 | build-verified | `ui/ProviderFailoverSection.kt` | |
-| BR-6 | P0 | partial | presets exist | "Verified with Test button" is a runtime claim, not CI |
-| BR-7 | P1 | partial | client exists | SSE streaming unaudited |
+| BR-6 | P0 | audited (2026-11-24) | presets + `testConnection` | Test button makes a real HTTPS round trip (models fetch + tiny completion) with honest 404/model-mismatch guidance; the button's runtime result is inherently device-verified, not CI |
+| BR-7 | P1 | absent (audited 2026-11-24) | client exists | No SSE client: `OpenAiCompatibleClient.complete` is a single-shot POST; `supportsStreaming` is a config flag nothing consumes |
 | BR-8 | P1 | unit-verified | `SkillToolMapperTest` | Tool schema mapping; provider round-trip needs network |
 | BR-9 | P1 | partial | — | Rolling history unaudited |
 | BR-10 | P1 | unit-verified | `PersonaTest` (2026-11-24) | Persona prompt is `brain-core/resources/persona/system-prompt.v1.md` loaded via `Persona` (version marker enforced); wording change = new file version + VERSION bump; SkillAuthoringService's drafting prompt is a separate function and stays separate |
@@ -40,14 +40,14 @@ steps run by the owner.
 | CT-5 | P0 | unit-verified (logic) | `ContactContextBoostTest` | Signal COLLECTION parked: owner privacy-scope decision open |
 | CT-6 | P0 | unit-verified | `ContactScorer` bands in `ContactMatchingTest` | |
 | CT-7 | P0 | unit-verified | `ContactCorrectionTest` | |
-| CT-8 | P1 | partial | — | 2 s cancelable countdown unaudited |
+| CT-8 | P1 | absent (audited 2026-11-24) | — | No 2 s cancelable countdown; high-confidence calls place immediately in `AndroidActuator`. Message drafts already show first. Safety-relevant build, needs owner-visible design |
 | CT-9 | P1 | unit-verified | `ContactGoldenEvalTest` | 200 pairs, ≥90% top-1 / ≥98% top-3 asserted in CI |
-| CT-10 | P1 | partial | — | Multi-number label pick unaudited |
+| CT-10 | P1 | absent (audited 2026-11-24) | rejection memory only | No number-label column in `ContactEntity`, no label parsing ("call Rahul work"), no label-aware scoring; learned preference exists only as rejection-based avoidance ("won't pick that again") |
 | AP-1 | P0 | build-verified | `apps/` inventory | Refresh-on-broadcast unaudited |
 | AP-2 | P0 | unit-verified | `AppResolverTest` | Built-in + learned aliases |
 | AP-3 | P0 | unit-verified | `DeepLinksTest` | |
 | AP-4 | P1 | build-verified | `ui/accessibility/` toggle surface | Refusal wording unaudited |
-| AP-5 | P1 | partial | `RaijinAccessibilityService` | Primitives inventory unaudited |
+| AP-5 | P1 | audited (2026-11-24) | `RaijinAccessibilityService` | Inventory: single-purpose WhatsApp send automation (find send button, click, timeout watcher). No general primitives (click-by-text, scroll, text entry, back) |
 | AP-6 | P1 | missing | — | See→decide→act loop |
 | AP-7 | P1 | unit-verified (policy) | `A11ySafetyPolicyTest` (2026-11-24) | Denylist + irreversible-action confirm + payments-blocked policy in brain-core, wired as the chokepoint in `RaijinAccessibilityService`; WhatsApp send unchanged (brain confirm = the confirmation). Device-level refusal unverified |
 | AP-8 | P1 | partial | `SessionTrustPolicy` + test (media analogue) | Screen-content egress consent unaudited |
@@ -55,7 +55,7 @@ steps run by the owner.
 | TM-1 | P0 | unit-verified | `HinglishTimeParserTest` | 108 cases ≥ PRD's 100 |
 | TM-2 | P0 | build-verified | `SET_ALARM` declared; actuator path | Clock-app skip-UI is OEM-dependent |
 | TM-3 | P0 | build-verified | actuator path | |
-| TM-4 | P0 | partial | reminder engine + `ReminderBroadcastReceiver` | Exact-alarm runtime prompt unaudited |
+| TM-4 | P0 | audited (2026-11-24) | reminder engine + `ReminderBroadcastReceiver` | Exact-alarm prompt exists: `PermissionBroker` opens `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` at need; receiver checks `canScheduleExactAlarms()` and falls back to inexact honestly. The prompt itself is device-visible only |
 | TM-5 | P0 | build-verified | `ReminderRearmReceiver` | Boot/timezone re-arm device-only |
 | TM-6 | P0 | build-verified | receiver + notification path | Spoken context line unaudited |
 | TM-7 | P0 | unit-verified | `RaijinBrainTest` cancel/list/undo rows, `BrainContractTest`, `UndoChipSnapshotTest` | 5s undo chip after voice-created reminders (2026-11-23): tap-only (voice "undo" future); proactive auto-schedule keeps Done flash; device flow unverified |
