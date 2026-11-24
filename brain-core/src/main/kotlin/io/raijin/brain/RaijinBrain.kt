@@ -490,7 +490,7 @@ class RaijinBrain(
                         val answer = try {
                             cloudReasoning.complete(
                                 prompt = rawText,
-                                systemPrompt = "You are Raijin, a tactical, highly competent, and concise personal AI companion. Keep answers clear, direct, and actionable.",
+                                systemPrompt = Persona.systemPrompt,
                             )
                         } catch (e: Exception) {
                             emit(IslandVisualState.Failed(errorReason = "Cloud request failed: ${e.message}", recoverable = true))
