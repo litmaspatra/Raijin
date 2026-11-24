@@ -67,7 +67,7 @@ steps run by the owner.
 | MU-5 | P1 | unit-verified | `PlayerEventTrackerTest` | |
 | MU-6 | P1 | unit-verified | `MusicTasteModelTest`, `MusicTasteStoreTest` | |
 | MU-7 | P1 | unit-verified | `MusicTasteSamplerTest` | Acceptance rate is owner-measured, open |
-| MU-8 | P1 | partial | taste model update path | Voice feedback phrases unaudited |
+| MU-8 | P1 | unit-verified | `MU-8` parse tests in `RaijinBrainTest` + taste-model tests (2026-11-24) | "pasand aaya" → LIKED, "ye mat chalao" → DISLIKED (parsed before play-query so it is never shadowed), "aur aisa" → MORE_LIKE_THIS, each with common variants; actuation records a `MusicEvent` into `MusicTasteStore` immediately with honest failures when notification access is off or nothing is playing |
 | ST-1 | P1 | partial | All-files prompt deferred to first use | |
 | ST-2 | P1 | partial | `StorageAuditor` | Room index + WorkManager scan unaudited |
 | ST-3 | P1 | unit-verified | `DuplicateDetectorTest` (2026-11-23) | brain-core funnel: size → edge hash → full hash; no Android wiring yet (M2 gate) |
