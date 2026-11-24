@@ -35,6 +35,7 @@ enum class ActionType {
     FIND_FILE,
     ORGANIZE_FILES,
     DELETE_FILES,
+    /** NT-5: answer a notification question locally from the listener buffer. */
     READ_NOTIFICATIONS,
     DRAFT_DOCUMENT,
     BUILD_APP,
@@ -255,6 +256,17 @@ sealed interface ActionArgs {
             }
             require(location == null || location.isNotBlank()) {
                 "location must be null or non-blank"
+            }
+        }
+    }
+
+    /** NT-5: notification question; optional app name filter (label fragment). */
+    data class NotificationQuery(
+        val appFilter: String? = null,
+    ) : ActionArgs {
+        init {
+            require(appFilter == null || appFilter.isNotBlank()) {
+                "notification app filter must be null or non-blank"
             }
         }
     }

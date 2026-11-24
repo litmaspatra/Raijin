@@ -407,6 +407,20 @@ class RaijinBrain(
                     result
                 }
 
+                is ParsedIntent.NotificationQuery -> {
+                    // NT-5: actuator answers locally from the notification buffer.
+                    val result = DispatchResult(
+                        traceId = traceId,
+                        actionType = ActionType.READ_NOTIFICATIONS,
+                        args = ActionArgs.NotificationQuery(appFilter = intent.appFilter),
+                        confidence = 0.9f,
+                        risk = ActionRisk.LOW,
+                        vocalResponse = null, // actuator speaks the answer
+                    )
+                    execute(result)
+                    result
+                }
+
                 is ParsedIntent.DismissAlarm -> {
                     val result = DispatchResult(
                         traceId = traceId,
@@ -1230,6 +1244,9 @@ private sealed interface ParsedIntent {
         val conditionWatchContact: String? = null,
     ) : ParsedIntent
 
+    /** NT-5: "kya notifications aaye?" — answered locally from the buffer. */
+    data class NotificationQuery(val appFilter: String? = null) : ParsedIntent
+
     data object CleanStorage : ParsedIntent
 
     /** TM-2: system Clock alarm. */
@@ -1530,6 +1547,7 @@ private object ReflexParser {
         // TM-7 cancel/list
         parseCancel(text, now)?.let { return it }
         parseListReminders(text)?.let { return it }
+        parseNotificationQuery(text)?.let { return it }
 
         // Reminders: "remind me to call Mom in 10 minutes"
         reminderInTime.matchEntire(text)?.let { match ->
@@ -1701,6 +1719,46 @@ private object ReflexParser {
 
     private fun parseListReminders(text: String): ParsedIntent? =
         if (listReminders.matches(text)) ParsedIntent.ListReminders else null
+
+    // ------------------------------------------------------------------
+    // NT-5 notification questions (answered locally from the buffer)
+    // ------------------------------------------------------------------
+
+    private val notificationQueryGeneral = Regex(
+        """^(?:kya notifications? aaye|notifications? aaye kya|mere notifications? batao|what notifications? (?:came|did i get|have i got)|any new notifications?|check my notifications?)\??$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val notificationQueryAppHindi = Regex(
+        """^([a-zA-Z][a-zA-Z0-9 ]{0,24}?)\s+pe\s+(?:kisne bheja|kya aaya)\??$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val notificationQueryAppEnglish = Regex(
+        """^(?:what came on|any) ([a-zA-Z][a-zA-Z0-9 ]{0,24}?)(?:\s+messages?)?\??$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * Anchored full-string patterns only, so they cannot shadow reminders or
+     * other commands. Generic words ("new", "messages") after "any" are a
+     * general query, not an app filter.
+     */
+    private val genericQueryWords = setOf("new", "message", "messages", "notification", "notifications")
+
+    private fun parseNotificationQuery(text: String): ParsedIntent? {
+        if (notificationQueryGeneral.matches(text)) return ParsedIntent.NotificationQuery(null)
+        notificationQueryAppHindi.matchEntire(text)?.let { m ->
+            val app = m.groupValues[1].trim()
+            if (app.isNotBlank()) return ParsedIntent.NotificationQuery(app)
+        }
+        notificationQueryAppEnglish.matchEntire(text)?.let { m ->
+            val app = m.groupValues[1].trim()
+            if (app.isNotBlank() && app.lowercase() !in genericQueryWords) {
+                return ParsedIntent.NotificationQuery(app)
+            }
+            return ParsedIntent.NotificationQuery(null)
+        }
+        return null
+    }
 
     // ------------------------------------------------------------------
     // TM-4 general reminder parsing

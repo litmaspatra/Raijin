@@ -1971,3 +1971,55 @@ class ConditionalReminderTest {
         assertNull(args.condition)
     }
 }
+
+/** NT-5: notification questions route to READ_NOTIFICATIONS with an optional app filter. */
+class NotificationQueryParseTest {
+
+    @Test
+    fun prdHinglishUtterancesParse() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        val general = brain.processUtterance("kya notifications aaye?", "nq-1")
+        assertEquals(ActionType.READ_NOTIFICATIONS, general.actionType)
+        assertNull(assertIs<ActionArgs.NotificationQuery>(general.args).appFilter)
+
+        val filtered = brain.processUtterance("WhatsApp pe kisne bheja?", "nq-2")
+        assertEquals(ActionType.READ_NOTIFICATIONS, filtered.actionType)
+        assertEquals("WhatsApp", assertIs<ActionArgs.NotificationQuery>(filtered.args).appFilter)
+    }
+
+    @Test
+    fun englishVariantsParse() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        val general = brain.processUtterance("any new notifications", "nq-3")
+        assertEquals(ActionType.READ_NOTIFICATIONS, general.actionType)
+        assertNull(assertIs<ActionArgs.NotificationQuery>(general.args).appFilter)
+
+        val filtered = brain.processUtterance("what came on gmail", "nq-4")
+        assertEquals(ActionType.READ_NOTIFICATIONS, filtered.actionType)
+        assertEquals("gmail", assertIs<ActionArgs.NotificationQuery>(filtered.args).appFilter)
+    }
+
+    @Test
+    fun notificationWordsInsideCommandsAreNotHijacked() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        // Not an anchored question pattern: stays a reminder.
+        val res = brain.processUtterance("remind me to check notifications at 6 pm", "nq-5")
+        assertEquals(ActionType.CREATE_REMINDER, res.actionType)
+    }
+
+    @Test
+    fun genericAnyMessagesIsGeneralNotABogusFilter() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+
+        val res = brain.processUtterance("any messages", "nq-6")
+        assertEquals(ActionType.READ_NOTIFICATIONS, res.actionType)
+        assertNull(assertIs<ActionArgs.NotificationQuery>(res.args).appFilter)
+    }
+}

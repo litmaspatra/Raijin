@@ -277,6 +277,14 @@ class BrainContractTest {
     }
 
     @Test
+    fun notificationQueryRejectsBlankAppFilter() {
+        assertFailsWith<IllegalArgumentException> {
+            ActionArgs.NotificationQuery(appFilter = " ")
+        }
+        assertEquals(null, ActionArgs.NotificationQuery().appFilter)
+    }
+
+    @Test
     fun briefRejectsBlankOrEmptyLines() {
         assertFailsWith<IllegalArgumentException> {
             IslandVisualState.Brief(emptyList())
