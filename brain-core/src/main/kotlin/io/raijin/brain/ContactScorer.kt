@@ -51,6 +51,12 @@ object ContactScorer {
         val contactId: String,
         val displayName: String,
         val aliases: List<String> = emptyList(),
+        /**
+         * CT-10: the address-book number label ("mobile", "work", "home"...).
+         * Matched as the extra name form "<displayName> <label>", so
+         * "call Rahul work" resolves the work number with no grammar change.
+         */
+        val numberLabel: String? = null,
     )
 
     /**
@@ -62,7 +68,11 @@ object ContactScorer {
      */
     fun bestMatchEntry(entry: Entry, sttAlternatives: List<String>): Match? {
         var best: Match? = null
-        for (nameForm in listOf(entry.displayName) + entry.aliases) {
+        val labelForm = entry.numberLabel
+            ?.takeIf { it.isNotBlank() }
+            ?.let { listOf("${entry.displayName} $it") }
+            .orEmpty()
+        for (nameForm in listOf(entry.displayName) + entry.aliases + labelForm) {
             for (alt in sttAlternatives) {
                 val score = ContactPhonetics.similarity(alt, nameForm)
                 if (best == null || score > best.score) {

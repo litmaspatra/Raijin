@@ -69,6 +69,14 @@ data class ContactEntity(
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis(),
+
+    /**
+     * CT-10: transient address-book number label ("mobile"/"work"/"home").
+     * Read live from the device on each resolve; deliberately NOT a column,
+     * so no migration — learned entities leave it null.
+     */
+    @androidx.room.Ignore
+    val numberLabel: String? = null,
 )
 
 // ---------------------------------------------------------------------------

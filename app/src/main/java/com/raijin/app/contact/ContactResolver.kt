@@ -34,7 +34,9 @@ class ContactResolver(
         // Device contacts: transient entities keyed by phone number.
         for (c in permissionBroker.queryAllContacts()) {
             val ref = "device:${c.phoneNumber}"
-            entries += ContactScorer.Entry(contactId = ref, displayName = c.displayName)
+            // CT-10: the address-book number label is an extra matchable form
+            // ("Rahul Sharma work") and survives on the entity for option labels.
+            entries += ContactScorer.Entry(contactId = ref, displayName = c.displayName, numberLabel = c.numberLabel)
             entitiesByRef[ref] = ContactEntity(
                 id = 0,
                 canonicalName = c.displayName,
@@ -42,6 +44,7 @@ class ContactResolver(
                 aliases = "",
                 phoneNumber = c.phoneNumber,
                 group = c.group.name,
+                numberLabel = c.numberLabel,
             )
         }
 
@@ -82,15 +85,35 @@ class ContactResolver(
                     confidence = top.score.toFloat(),
                 )
             }
-            ContactScorer.Confidence.ASK -> ResolveResult.Multiple(
-                candidates = effective.filter { it.score >= 0.50 && it.score >= effective.first().score - 0.15 }
-                    .take(4).map { entitiesByRef.getValue(it.contactId) },
-                query = query,
-                confidenceByPhone = effective.associate {
-                    entitiesByRef.getValue(it.contactId).phoneNumber to it.score.toFloat()
-                },
-            )
+            ContactScorer.Confidence.ASK -> {
+                val candidates = effective.filter { it.score >= 0.50 && it.score >= effective.first().score - 0.15 }
+                    .take(4).map { entitiesByRef.getValue(it.contactId) }
+                ResolveResult.Multiple(
+                    // CT-10: same-name options are shown with their number
+                    // label ("Rahul (work)") so the owner can tell them apart.
+                    candidates = labelDuplicateNames(candidates),
+                    query = query,
+                    confidenceByPhone = effective.associate {
+                        entitiesByRef.getValue(it.contactId).phoneNumber to it.score.toFloat()
+                    },
+                )
+            }
             ContactScorer.Confidence.MISS -> ResolveResult.NotFound
+        }
+    }
+
+    /**
+     * CT-10: when a clarification list contains the same display name for
+     * different numbers, suffix each duplicate with its number label
+     * ("Rahul (work)") so the spoken options are distinguishable. Candidates
+     * with a unique name or no label are returned unchanged.
+     */
+    private fun labelDuplicateNames(candidates: List<ContactEntity>): List<ContactEntity> {
+        val counts = candidates.groupingBy { it.displayName.lowercase() }.eachCount()
+        return candidates.map { e ->
+            if (counts.getValue(e.displayName.lowercase()) > 1 && !e.numberLabel.isNullOrBlank()) {
+                e.copy(displayName = "${e.displayName} (${e.numberLabel})")
+            } else e
         }
     }
 
