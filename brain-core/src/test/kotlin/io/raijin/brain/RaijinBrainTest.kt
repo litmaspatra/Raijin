@@ -811,6 +811,67 @@ class RaijinBrainTest {
     }
 
     @Test
+    fun followUpQuestionCarriesRecentSessionTurnsToCloud() = runTest {
+        val prompts = mutableListOf<String>()
+        val recordingCloud = object : CloudReasoningPort {
+            override val isConfigured: Boolean = true
+            override suspend fun complete(prompt: String, systemPrompt: String?, temperature: Float): String {
+                prompts += prompt
+                return "answer ${prompts.size}"
+            }
+        }
+        val brain = RaijinBrain(FakeMemory(), RecordingActuator(), cloudReasoning = recordingCloud)
+
+        brain.processUtterance("What is quantum entanglement?", "trace-q1")
+        brain.processUtterance("what about tomorrow?", "trace-q2")
+
+        assertEquals("What is quantum entanglement?", prompts[0])
+        assertTrue(prompts[1].startsWith("Recent conversation:\n"), prompts[1])
+        assertTrue(prompts[1].contains("User: What is quantum entanglement?"), prompts[1])
+        assertTrue(prompts[1].contains("Raijin: answer 1"), prompts[1])
+        assertTrue(prompts[1].endsWith("Current message: what about tomorrow?"), prompts[1])
+    }
+
+    @Test
+    fun nonFollowUpQuestionSendsOnlyTheCurrentMessageToCloud() = runTest {
+        val prompts = mutableListOf<String>()
+        val recordingCloud = object : CloudReasoningPort {
+            override val isConfigured: Boolean = true
+            override suspend fun complete(prompt: String, systemPrompt: String?, temperature: Float): String {
+                prompts += prompt
+                return "answer"
+            }
+        }
+        val brain = RaijinBrain(FakeMemory(), RecordingActuator(), cloudReasoning = recordingCloud)
+
+        brain.processUtterance("What is quantum entanglement?", "trace-q1")
+        brain.processUtterance("What is the capital of France?", "trace-q2")
+
+        assertEquals("What is the capital of France?", prompts[1])
+    }
+
+    @Test
+    fun clearHistoryWipesSessionTurnsLocally() = runTest {
+        val prompts = mutableListOf<String>()
+        val recordingCloud = object : CloudReasoningPort {
+            override val isConfigured: Boolean = true
+            override suspend fun complete(prompt: String, systemPrompt: String?, temperature: Float): String {
+                prompts += prompt
+                return "answer"
+            }
+        }
+        val brain = RaijinBrain(FakeMemory(), RecordingActuator(), cloudReasoning = recordingCloud)
+
+        brain.processUtterance("What is quantum entanglement?", "trace-q1")
+        val cleared = brain.processUtterance("clear history", "trace-clear")
+        assertEquals("Conversation history cleared.", cleared.vocalResponse)
+        assertEquals(1, prompts.size) // the clear itself never reaches the cloud
+
+        brain.processUtterance("what about tomorrow?", "trace-q2")
+        assertEquals("what about tomorrow?", prompts[1]) // no history survived
+    }
+
+    @Test
     fun cloudReasoningFailureProducesRecoverableFailedState() = runTest {
         val failingCloud = object : CloudReasoningPort {
             override val isConfigured: Boolean = true

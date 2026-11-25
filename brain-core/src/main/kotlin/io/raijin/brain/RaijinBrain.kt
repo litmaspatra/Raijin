@@ -62,6 +62,12 @@ class RaijinBrain(
     /** AP-2: most recent app open, kept briefly so an explicit correction can teach an alias. */
     private var lastOpenedApp: LastOpenedApp? = null
 
+    /**
+     * BR-9: in-memory conversational turns for per-request cloud context.
+     * Memory-only (never persisted); wiped by "clear history".
+     */
+    private val sessionTurns = SessionTurnLog()
+
     init { require(actuatorTimeoutMillis > 0) { "actuator timeout must be positive" } }
 
     private val speechAlternatives = ConcurrentHashMap<String, List<String>>()
@@ -78,6 +84,20 @@ class RaijinBrain(
     override suspend fun processUtterance(rawText: String, traceId: String): DispatchResult {
         require(rawText.isNotBlank()) { "utterance must not be blank" }
         require(traceId.isNotBlank()) { "traceId must not be blank" }
+
+        // BR-9: clear-on-demand. Local only; never reaches the parser or cloud.
+        if (SessionHistoryClear.matches(rawText)) {
+            sessionTurns.clear()
+            val reply = "Conversation history cleared."
+            emit(IslandVisualState.Done(feedbackLine = reply))
+            return DispatchResult(
+                traceId = traceId,
+                actionType = ActionType.NONE,
+                confidence = 1.0f,
+                risk = ActionRisk.LOW,
+                vocalResponse = reply,
+            )
+        }
 
         // CT-7: an explicit wrong-contact correction ("wrong number", "not
         // him", "I meant ...") while a contact confirmation is pending records
@@ -470,6 +490,9 @@ class RaijinBrain(
                 is ParsedIntent.Chat -> {
                     // BR-1: instant local answer; nothing for the actuator to run.
                     emit(IslandVisualState.Done(feedbackLine = intent.reply))
+                    sessionTurns.record(
+                        SessionTurn(rawText, intent.reply, System.currentTimeMillis()),
+                    )
                     DispatchResult(
                         traceId = traceId,
                         actionType = ActionType.CHAT_REPLY,
@@ -488,8 +511,12 @@ class RaijinBrain(
                             ),
                         )
                         val answer = try {
+                            // BR-9: per-request context — follow-ups carry up to
+                            // the last 3 session turns; anything else sends the
+                            // current message unchanged. Approved owner wording
+                            // lives in the PR body / STATUS.md.
                             cloudReasoning.complete(
-                                prompt = rawText,
+                                prompt = SessionContextPrompt.build(rawText, sessionTurns),
                                 systemPrompt = Persona.systemPrompt,
                             )
                         } catch (e: Exception) {
@@ -502,6 +529,9 @@ class RaijinBrain(
                             )
                         }
                         emit(IslandVisualState.Done(feedbackLine = answer))
+                        sessionTurns.record(
+                            SessionTurn(rawText, answer, System.currentTimeMillis()),
+                        )
                         DispatchResult(
                             traceId = traceId,
                             actionType = ActionType.NONE,

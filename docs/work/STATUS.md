@@ -30,7 +30,7 @@ steps run by the owner.
 | BR-6 | P0 | audited (2026-11-24) | presets + `testConnection` | Test button makes a real HTTPS round trip (models fetch + tiny completion) with honest 404/model-mismatch guidance; the button's runtime result is inherently device-verified, not CI |
 | BR-7 | P1 | absent (audited 2026-11-24) | client exists | No SSE client: `OpenAiCompatibleClient.complete` is a single-shot POST; `supportsStreaming` is a config flag nothing consumes |
 | BR-8 | P1 | unit-verified | `SkillToolMapperTest` | Tool schema mapping; provider round-trip needs network |
-| BR-9 | P1 | partial | — | Rolling history unaudited |
+| BR-9 | P1 | unit-verified | `SessionContextTest`, `RaijinBrainTest` | Per-request context selection (owner decision 2026-11-25 supersedes the PRD rolling window): follow-up questions carry up to the last 3 session turns to the cloud; anything else sends the current message unchanged. History in-memory only (never persisted); "clear history" wipes it locally. No contacts/memory facts/location in cloud prompts |
 | BR-10 | P1 | unit-verified | `PersonaTest` (2026-11-24) | Persona prompt is `brain-core/resources/persona/system-prompt.v1.md` loaded via `Persona` (version marker enforced); wording change = new file version + VERSION bump; SkillAuthoringService's drafting prompt is a separate function and stays separate |
 | BR-11 | P1 | unit-verified | `EgressGateTest`, `ToolEgressPolicy` | L0/L1/L2 gate vs provider fake |
 | CT-1 | P0 | unit-verified | `RaijinDatabaseMigrationTest` (2026-11-23) | ContactEntity registered, real migrations tested |
