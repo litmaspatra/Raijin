@@ -19,6 +19,8 @@ data class ResolvedContact(
     val displayName: String,
     val phoneNumber: String,
     val group: ContactGroup,
+    /** CT-10: normalized address-book number label ("mobile"/"work"/"home"/custom), null when unset. */
+    val numberLabel: String? = null,
 )
 
 // ── Broker ────────────────────────────────────────────────────────────────
@@ -176,18 +178,25 @@ class PermissionBroker(private val context: Context) {
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.Phone.NUMBER,
+            ContactsContract.CommonDataKinds.Phone.TYPE,
+            ContactsContract.CommonDataKinds.Phone.LABEL,
         )
         val cursor: Cursor? = context.contentResolver.query(uri, projection, null, null, null)
         cursor?.use {
             val nameIdx   = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
             val numberIdx = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val typeIdx   = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
+            val labelIdx  = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LABEL)
             while (it.moveToNext()) {
                 val name   = it.getString(nameIdx)  ?: continue
                 val number = it.getString(numberIdx) ?: continue
+                val type   = if (typeIdx >= 0) it.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
+                val custom = if (labelIdx >= 0) it.getString(labelIdx) else null
                 results += ResolvedContact(
                     displayName = name,
                     phoneNumber = number.replace("\\s".toRegex(), ""),
                     group       = inferGroup(name),
+                    numberLabel = normalizeNumberLabel(type, custom),
                 )
             }
         }
@@ -269,6 +278,26 @@ class PermissionBroker(private val context: Context) {
             false
         }
     }
+
+    /**
+     * CT-10: fold the ContactsContract phone type into a small spoken label.
+     * Custom labels keep their own words (trimmed, lowercased); unknown types
+     * map to null so they add no name form.
+     */
+    fun normalizeNumberLabel(type: Int, customLabel: String?): String? =
+        when (type) {
+            ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> "mobile"
+            ContactsContract.CommonDataKinds.Phone.TYPE_WORK,
+            ContactsContract.CommonDataKinds.Phone.TYPE_WORK_MOBILE,
+            ContactsContract.CommonDataKinds.Phone.TYPE_WORK_PAGER,
+            ContactsContract.CommonDataKinds.Phone.TYPE_COMPANY_MAIN,
+            ContactsContract.CommonDataKinds.Phone.TYPE_ASSISTANT -> "work"
+            ContactsContract.CommonDataKinds.Phone.TYPE_HOME,
+            ContactsContract.CommonDataKinds.Phone.TYPE_MAIN -> "home"
+            ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM ->
+                customLabel?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+            else -> null
+        }
 
     /**
      * Infers contact group from display name keywords.

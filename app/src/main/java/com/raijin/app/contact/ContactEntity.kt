@@ -69,7 +69,17 @@ data class ContactEntity(
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis(),
-)
+) {
+    /**
+     * CT-10: transient address-book number label ("mobile"/"work"/"home").
+     * Read live from the device on each resolve; deliberately NOT a column,
+     * so no migration — learned entities leave it null. A body property
+     * (Room KSP rejects @Ignore constructor params), so copy() drops it and
+     * callers re-attach it.
+     */
+    @androidx.room.Ignore
+    var numberLabel: String? = null
+}
 
 // ---------------------------------------------------------------------------
 // CorrectionEntry — permanent record of every mis-resolution Raijin made
