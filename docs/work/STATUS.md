@@ -50,7 +50,7 @@ steps run by the owner.
 | AP-5 | P1 | audited (2026-11-24) | `RaijinAccessibilityService` | Inventory: single-purpose WhatsApp send automation (find send button, click, timeout watcher). No general primitives (click-by-text, scroll, text entry, back) |
 | AP-6 | P1 | missing | — | See→decide→act loop |
 | AP-7 | P1 | unit-verified (policy) | `A11ySafetyPolicyTest` (2026-11-24) | Denylist + irreversible-action confirm + payments-blocked policy in brain-core, wired as the chokepoint in `RaijinAccessibilityService`; WhatsApp send unchanged (brain confirm = the confirmation). Device-level refusal unverified |
-| AP-8 | P1 | partial | `SessionTrustPolicy` + test (media analogue) | Screen-content egress consent unaudited |
+| AP-8 | P1 | absent, moot today (audited 2026-11-24) | `SessionTrustPolicy` + test (media analogue) | No screen content leaves the device anywhere: the accessibility service only locates/clicks WhatsApp's send button, message text is pre-composed locally. The L2 per-session consent mechanism is absent but has nothing to gate until held AP-6 lands |
 | AP-9 | P1 | build-verified | `OemSetupSection.kt` | |
 | TM-1 | P0 | unit-verified | `HinglishTimeParserTest` | 108 cases ≥ PRD's 100 |
 | TM-2 | P0 | build-verified | `SET_ALARM` declared; actuator path | Clock-app skip-UI is OEM-dependent |
