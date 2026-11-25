@@ -36,6 +36,7 @@ import com.raijin.app.ui.island.TraceLine
 import io.raijin.brain.RaijinBrain
 import io.raijin.contract.ActionRisk
 import io.raijin.contract.CapabilitySnapshot
+import io.raijin.contract.InputKind
 import io.raijin.contract.IslandVisualState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1250,6 +1251,8 @@ class RaijinService : Service() {
             confirmLabel = vs.options.firstOrNull()?.label ?: "Execute",
             cancelLabel = "Abort",
             isDangerous = vs.risk == ActionRisk.HIGH,
+            // CT-8: a countdown confirms itself; only the cancel control shows.
+            confirmEnabled = vs.kind != InputKind.COUNTDOWN,
         )
         is IslandVisualState.Done ->
             // UI-5: long answers get the expandable card, not a one-line flash.

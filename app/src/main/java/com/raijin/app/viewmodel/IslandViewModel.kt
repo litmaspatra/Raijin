@@ -181,8 +181,10 @@ private fun IslandVisualState.toIslandState(): IslandState = when (this) {
         // An option-less clarification is answered by voice/text, not a
         // button: hide the affirmative control instead of showing an inert
         // one. (Contact clarifications carry candidate options and are
-        // unchanged.)
-        confirmEnabled = !(kind == InputKind.CLARIFICATION && options.isEmpty()),
+        // unchanged.) CT-8: a countdown confirms itself, so it renders
+        // only its cancel control.
+        confirmEnabled = !(kind == InputKind.CLARIFICATION && options.isEmpty()) &&
+            kind != InputKind.COUNTDOWN,
         traceId      = traceId,
         actionId     = traceId, // contract has only traceId; actionId kept for UI compat
     )

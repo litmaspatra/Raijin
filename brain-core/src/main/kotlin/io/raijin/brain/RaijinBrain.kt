@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
@@ -41,6 +42,7 @@ class RaijinBrain(
     private val actuator: ActuatorPort,
     private val cloudReasoning: CloudReasoningPort? = null,
     private val actuatorTimeoutMillis: Long = 30_000L,
+    private val callCountdownMillis: Long = 2_000L,
 ) : RaijinBrainBridge {
     private val _islandState = MutableStateFlow<IslandVisualState>(IslandVisualState.Idle)
     override val islandState: StateFlow<IslandVisualState> = _islandState.asStateFlow()
@@ -68,7 +70,10 @@ class RaijinBrain(
      */
     private val sessionTurns = SessionTurnLog()
 
-    init { require(actuatorTimeoutMillis > 0) { "actuator timeout must be positive" } }
+    init {
+        require(actuatorTimeoutMillis > 0) { "actuator timeout must be positive" }
+        require(callCountdownMillis > 0) { "call countdown must be positive" }
+    }
 
     private val speechAlternatives = ConcurrentHashMap<String, List<String>>()
 
@@ -602,6 +607,31 @@ class RaijinBrain(
         }
     }
 
+    /**
+     * CT-8: after the countdown window, confirm the call on the user's behalf
+     * unless someone already resolved the pending request. Mirrors the
+     * confirmed branch of [resolveActionConfirmation]: same acting-trace
+     * reservation, same one-shot removal, same alias learning.
+     */
+    private suspend fun autoConfirmCallAfterCountdown(result: DispatchResult) {
+        delay(callCountdownMillis)
+        val request = pending[result.traceId] ?: return
+        if (request.stage != PendingStage.CONFIRMATION || request.result == null) return
+        synchronized(actionLock) {
+            if (actingTrace != null || pending[result.traceId] !== request) return
+            actingTrace = result.traceId // reserve before removing pending
+            pending.remove(result.traceId, request)
+        }
+        learnConfirmedAliases(request)
+        try {
+            track(result.traceId, onCancelled = { Unit }) { execute(request.result) }
+        } finally {
+            synchronized(actionLock) {
+                if (actingTrace == result.traceId) actingTrace = null
+            }
+        }
+    }
+
     override suspend fun resolveChoice(traceId: String, optionId: String) {
         val request = pending[traceId] ?: return
         if (request.stage != PendingStage.CLARIFICATION) return
@@ -983,8 +1013,23 @@ class RaijinBrain(
             is ActionTarget.Contact -> target.displayName ?: target.ref
             else -> "this action"
         }
+        if (result.actionType == ActionType.CALL_CONTACT) {
+            // CT-8: calls never wait on a manual confirm. The countdown is the
+            // gate: untouched, the call goes out after the window; cancelled
+            // (island abort, a spoken cancel, or a superseding utterance), it
+            // never dials. Messages still always show the draft first.
+            emit(
+                IslandVisualState.NeedsInput(
+                    prompt = "Calling $label… tap to cancel",
+                    traceId = result.traceId,
+                    kind = InputKind.COUNTDOWN,
+                    risk = result.risk,
+                ),
+            )
+            autoConfirmCallAfterCountdown(result)
+            return
+        }
         val prompt = when (result.actionType) {
-            ActionType.CALL_CONTACT -> "Call $label?"
             ActionType.SEND_MESSAGE -> "Send this message to $label?"
             ActionType.OPEN_DEEP_LINK -> {
                 // AP-3: show the normalized number being opened, so a wrong
