@@ -40,7 +40,7 @@ steps run by the owner.
 | CT-5 | P0 | unit-verified (logic) | `ContactContextBoostTest` | Signal COLLECTION parked: owner privacy-scope decision open |
 | CT-6 | P0 | unit-verified | `ContactScorer` bands in `ContactMatchingTest` | |
 | CT-7 | P0 | unit-verified | `ContactCorrectionTest` | |
-| CT-8 | P1 | absent (audited 2026-11-24) | — | No 2 s cancelable countdown; high-confidence calls place immediately in `AndroidActuator`. Message drafts already show first. Safety-relevant build, needs owner-visible design |
+| CT-8 | P1 | unit-verified | CT-8 tests in `RaijinBrainTest` (2026-11-25) | Calls replaced the manual confirm gate with a 2 s auto-proceed countdown ("Calling X… tap to cancel", new `InputKind.COUNTDOWN`, cancel-only control in both island mappings); messages still confirm manually. Explicit confirm inside the window hurries the call; supersede/cancel/correction all abort the dial. Device rendering remains device-pending |
 | CT-9 | P1 | unit-verified | `ContactGoldenEvalTest` | 200 pairs, ≥90% top-1 / ≥98% top-3 asserted in CI |
 | CT-10 | P1 | unit-verified | `ContactNumberLabelTest` | Address-book number label (mobile/work/home/custom) matches as an extra name form ("call Rahul work"); same-name clarification options show the label ("Rahul (work)"). Learned per-number preference rides the existing CT-7 alias learning (picking a number learns the spoken form for that phone). Label is transient (`@Ignore`, no migration) |
 | AP-1 | P0 | build-verified | `apps/` inventory | Refresh-on-broadcast unaudited |

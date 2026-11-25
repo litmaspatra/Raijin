@@ -116,6 +116,13 @@ enum class InputKind {
     CONFIRMATION,
     CLOUD_CONSENT,
     PERMISSION,
+
+    /**
+     * CT-8: an auto-proceed countdown ("Calling X… tap to cancel"). No
+     * affirmative control is rendered; untouched it confirms itself, the
+     * only user control is cancel.
+     */
+    COUNTDOWN,
 }
 
 data class InputOption(

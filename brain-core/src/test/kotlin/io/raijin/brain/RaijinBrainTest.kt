@@ -27,6 +27,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
@@ -70,7 +71,9 @@ class RaijinBrainTest {
     }
 
     @Test
-    fun callCarriesSpeakerFlagAndActsOnlyAfterExactTraceConfirmation() = runTest {
+    fun callShowsCountdownThenDialsAfterWindowWithoutManualConfirm() = runTest {
+        // CT-8: calls never wait on a manual confirm; the 2 s countdown is the
+        // gate. Untouched, the call dials when the window ends.
         val actuator = RecordingActuator()
         val memory = FakeMemory(
             "Maa" to listOf(EntityCandidate("contact:maa", "Maa", 0.99f)),
@@ -78,21 +81,46 @@ class RaijinBrainTest {
         val brain = RaijinBrain(memory, actuator)
 
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        val result = brain.processUtterance("call Maa on speaker", "trace-call")
+        val job = async { brain.processUtterance("call Maa on speaker", "trace-call") }
+        runCurrent()
 
-        val needsInput = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
-        assertEquals("trace-call", needsInput.traceId)
+        val countdown = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
+        assertEquals(InputKind.COUNTDOWN, countdown.kind)
+        assertEquals("trace-call", countdown.traceId)
+        assertEquals("Calling Maa… tap to cancel", countdown.prompt)
         assertTrue(actuator.actions.isEmpty())
-        assertTrue(assertIs<ActionArgs.Call>(result.args).speaker)
 
         brain.resolveActionConfirmation("wrong-trace", true)
         assertTrue(actuator.actions.isEmpty())
 
-        brain.resolveActionConfirmation("trace-call", true)
-
+        advanceUntilIdle()
+        val result = job.await()
         assertEquals(1, actuator.actions.size)
         assertEquals(ActionType.CALL_CONTACT, actuator.actions.single().actionType)
+        assertTrue(assertIs<ActionArgs.Call>(result.args).speaker)
         assertIs<IslandVisualState.Done>(brain.islandState.value)
+    }
+
+    @Test
+    fun cancellingDuringCallCountdownNeverDials() = runTest {
+        // CT-8: cancel inside the countdown window and the call never goes out.
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(
+            FakeMemory("Maa" to listOf(EntityCandidate("contact:maa", "Maa", 0.99f))),
+            actuator,
+        )
+        brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
+
+        val job = async { brain.processUtterance("call Maa", "trace-call") }
+        runCurrent()
+        assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
+
+        brain.resolveActionConfirmation("trace-call", false)
+        advanceUntilIdle()
+        job.await()
+
+        assertTrue(actuator.actions.isEmpty())
+        assertEquals(IslandVisualState.Done("Cancelled."), brain.islandState.value)
     }
 
     @Test
@@ -135,13 +163,15 @@ class RaijinBrainTest {
         assertEquals(InputKind.CLARIFICATION, choiceInput.kind)
         assertEquals(2, choiceInput.options.size)
 
-        brain.resolveChoice("trace-ambiguous", "contact:rahul-home")
+        val job = async { brain.resolveChoice("trace-ambiguous", "contact:rahul-home") }
+        runCurrent()
 
-        val confirmInput = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
-        assertEquals(InputKind.CONFIRMATION, confirmInput.kind)
+        val countdown = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
+        assertEquals(InputKind.COUNTDOWN, countdown.kind)
         assertTrue(actuator.actions.isEmpty())
 
-        brain.resolveActionConfirmation("trace-ambiguous", true)
+        advanceUntilIdle()
+        job.await()
 
         assertEquals(1, actuator.actions.size)
         val target = assertIs<ActionTarget.Contact>(actuator.actions.single().targets.single())
@@ -167,13 +197,15 @@ class RaijinBrainTest {
         val choiceInput = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
         assertEquals(InputKind.CLARIFICATION, choiceInput.kind)
 
-        brain.resolveClarification("trace-free-text", "office")
+        val job = async { brain.resolveClarification("trace-free-text", "office") }
+        runCurrent()
 
-        val confirmInput = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
-        assertEquals(InputKind.CONFIRMATION, confirmInput.kind)
-        assertEquals("Call Rahul Work?", confirmInput.prompt)
+        val countdown = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
+        assertEquals(InputKind.COUNTDOWN, countdown.kind)
+        assertEquals("Calling Rahul Work… tap to cancel", countdown.prompt)
 
-        brain.resolveActionConfirmation("trace-free-text", true)
+        advanceUntilIdle()
+        job.await()
 
         assertEquals(1, actuator.actions.size)
         val target = assertIs<ActionTarget.Contact>(actuator.actions.single().targets.single())
@@ -261,13 +293,17 @@ class RaijinBrainTest {
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
 
-        brain.processUtterance("call Maa", "trace-real")
+        val job = async { brain.processUtterance("call Maa", "trace-real") }
+        runCurrent()
         assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
 
         brain.cancelCurrentAction("trace-unknown")
         assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
 
+        // An explicit confirm inside the countdown window still hurries the call.
         brain.resolveActionConfirmation("trace-real", true)
+        advanceUntilIdle()
+        job.await()
         assertEquals(1, actuator.actions.size)
         assertIs<IslandVisualState.Done>(brain.islandState.value)
     }
@@ -334,11 +370,15 @@ class RaijinBrainTest {
             actuator,
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "trace-one")
+        val job = async { brain.processUtterance("call Maa", "trace-one") }
+        runCurrent()
         brain.resolveActionConfirmation("trace-unknown", true)
         assertTrue(actuator.actions.isEmpty())
         brain.resolveActionConfirmation("trace-one", false)
         brain.resolveActionConfirmation("trace-one", true)
+        assertTrue(actuator.actions.isEmpty())
+        advanceUntilIdle()
+        job.await()
         assertTrue(actuator.actions.isEmpty())
     }
 
@@ -389,10 +429,13 @@ class RaijinBrainTest {
         assertTrue(needsInput.prompt.contains("phone call permission"))
         assertTrue(actuator.actions.isEmpty())
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.resolveActionConfirmation("trace-perm", true)
-        val confirm = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
-        assertEquals(InputKind.CONFIRMATION, confirm.kind)
-        brain.resolveActionConfirmation("trace-perm", true)
+        val job = async { brain.resolveActionConfirmation("trace-perm", true) }
+        runCurrent()
+        val countdown = assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
+        assertEquals(InputKind.COUNTDOWN, countdown.kind)
+        assertTrue(actuator.actions.isEmpty())
+        advanceUntilIdle()
+        job.await()
         assertEquals(1, actuator.actions.size)
     }
 
@@ -444,10 +487,13 @@ class RaijinBrainTest {
             actuator,
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "trace-first")
+        val first = async { brain.processUtterance("call Maa", "trace-first") }
+        runCurrent()
         assertIs<IslandVisualState.NeedsInput>(brain.islandState.value)
         brain.processUtterance("open WhatsApp", "trace-second")
         brain.resolveActionConfirmation("trace-first", true)
+        advanceUntilIdle()
+        first.await()
         assertEquals(1, actuator.actions.size)
         assertEquals(ActionType.OPEN_APP, actuator.actions.single().actionType)
     }
@@ -564,7 +610,8 @@ class RaijinBrainTest {
             actuator,
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "call-trace")
+        val countdown = async { brain.processUtterance("call Maa", "call-trace") }
+        runCurrent()
         val caller = launch { brain.resolveActionConfirmation("call-trace", true) }
         started.await()
         val refused = brain.processUtterance("open WhatsApp", "late-trace")
@@ -572,6 +619,8 @@ class RaijinBrainTest {
         assertTrue(assertIs<IslandVisualState.Acting>(brain.islandState.value).actionSummary.contains("finishing your previous action"))
         release.complete(Unit)
         caller.join()
+        advanceUntilIdle()
+        countdown.await()
     }
 
     @Test
@@ -581,9 +630,11 @@ class RaijinBrainTest {
             RecordingActuator(),
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "call-trace")
+        // A message keeps the manual confirm gate (CT-8 countdowns only
+        // calls), so this still exercises the confirm-side reservation.
+        brain.processUtterance("message Maa: on my way", "msg-trace")
         val caller = launch(start = CoroutineStart.UNDISPATCHED) {
-            brain.resolveActionConfirmation("call-trace", true)
+            brain.resolveActionConfirmation("msg-trace", true)
         }
         caller.cancelAndJoin()
         val next = brain.processUtterance("open WhatsApp", "next-trace")
@@ -597,9 +648,9 @@ class RaijinBrainTest {
             RecordingActuator(),
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "call-trace")
+        brain.processUtterance("message Maa: on my way", "msg-trace")
         val caller = launch(start = CoroutineStart.UNDISPATCHED) {
-            brain.resolveActionConfirmation("call-trace", true)
+            brain.resolveActionConfirmation("msg-trace", true)
         }
         caller.cancelAndJoin()
         val next = brain.processUtterance("open WhatsApp", "next-trace")
@@ -620,12 +671,15 @@ class RaijinBrainTest {
             actuatorTimeoutMillis = 30_000,
         )
         brain.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        brain.processUtterance("call Maa", "call-timeout")
+        val countdown = async { brain.processUtterance("call Maa", "call-timeout") }
+        runCurrent()
         val caller = launch { brain.resolveActionConfirmation("call-timeout", true) }
         entered.await()
         advanceTimeBy(30_001)
         runCurrent()
         caller.join()
+        advanceUntilIdle()
+        countdown.await()
         assertEquals(
             "I couldn't confirm that finished. Check before trying again.",
             assertIs<IslandVisualState.Failed>(brain.islandState.value).errorReason,
@@ -1588,10 +1642,14 @@ class SpeechAlternativesRegressionTest {
         val a = RecordingActuator()
         val b = RaijinBrain(FakeMemory("Rahul" to listOf(EntityCandidate("contact:+919876543210", "Rahul", 0.99f))), a)
         b.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        val r = b.processAlternatives(listOf("call Raaul", "call Rahul"), "nbest-call")
+        val job = async { b.processAlternatives(listOf("call Raaul", "call Rahul"), "nbest-call") }
+        runCurrent()
+        assertEquals(0, a.actions.size) // countdown pending: nothing dials before the window
+        advanceUntilIdle()
+        val r = job.await()
         assertEquals(ActionType.CALL_CONTACT, r.actionType)
         assertEquals("contact:+919876543210", r.targets.single().let { assertIs<ActionTarget.Contact>(it).ref })
-        assertEquals(0, a.actions.size) // still requires owner confirmation
+        assertEquals(1, a.actions.size) // CT-8: window elapsed with no cancel -> dial
     }
     @Test fun alternativeCannotSwitchPrimaryActionType() = runTest {
         val a = RecordingActuator()
@@ -1675,8 +1733,11 @@ class ContactAliasLearningTest {
         )
         val brain = callCapableBrain(memory, actuator)
 
-        brain.processUtterance("call Rahul", "trace-learn-cancel")
+        val job = async { brain.processUtterance("call Rahul", "trace-learn-cancel") }
+        runCurrent()
         brain.resolveActionConfirmation("trace-learn-cancel", false)
+        advanceUntilIdle()
+        job.await()
 
         assertTrue(actuator.actions.isEmpty())
         assertTrue(memory.learnedAliases.isEmpty())
@@ -1724,8 +1785,11 @@ class ContactCorrectionRecordingTest {
         )
         val brain = callCapableBrain(memory, actuator)
 
-        brain.processUtterance("call Rahul", "trace-reject")
+        val job = async { brain.processUtterance("call Rahul", "trace-reject") }
+        runCurrent()
         brain.resolveActionConfirmation("trace-reject", false)
+        advanceUntilIdle()
+        job.await()
 
         assertEquals(0, actuator.actions.size)
         assertTrue(memory.corrections.isEmpty())
@@ -1740,8 +1804,13 @@ class ContactCorrectionRecordingTest {
         )
         val brain = callCapableBrain(memory, actuator)
 
-        brain.processUtterance("call Rahul", "trace-call")
+        // The correction must land inside the CT-8 countdown window, before
+        // the call dials itself.
+        val job = async { brain.processUtterance("call Rahul", "trace-call") }
+        runCurrent()
         brain.processUtterance("wrong number", "trace-correct")
+        advanceUntilIdle()
+        job.await()
 
         assertEquals(0, actuator.actions.size)
         assertEquals(
@@ -1758,8 +1827,11 @@ class ContactCorrectionRecordingTest {
         )
         val brain = callCapableBrain(memory, actuator)
 
-        brain.processUtterance("call Rahul", "trace-call2")
+        val job = async { brain.processUtterance("call Rahul", "trace-call2") }
+        runCurrent()
         brain.processUtterance("no, I meant Rahul home", "trace-correct2")
+        advanceUntilIdle()
+        job.await()
 
         assertEquals(
             listOf("rahul" to "contact:rahul-work"),
