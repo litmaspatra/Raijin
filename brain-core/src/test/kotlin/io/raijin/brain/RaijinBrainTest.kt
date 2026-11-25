@@ -1642,10 +1642,14 @@ class SpeechAlternativesRegressionTest {
         val a = RecordingActuator()
         val b = RaijinBrain(FakeMemory("Rahul" to listOf(EntityCandidate("contact:+919876543210", "Rahul", 0.99f))), a)
         b.submitCapabilitySnapshot(CapabilitySnapshot(contactsAvailable = true, phoneCallAvailable = true))
-        val r = b.processAlternatives(listOf("call Raaul", "call Rahul"), "nbest-call")
+        val job = async { b.processAlternatives(listOf("call Raaul", "call Rahul"), "nbest-call") }
+        runCurrent()
+        assertEquals(0, a.actions.size) // countdown pending: nothing dials before the window
+        advanceUntilIdle()
+        val r = job.await()
         assertEquals(ActionType.CALL_CONTACT, r.actionType)
         assertEquals("contact:+919876543210", r.targets.single().let { assertIs<ActionTarget.Contact>(it).ref })
-        assertEquals(0, a.actions.size) // still requires owner confirmation
+        assertEquals(1, a.actions.size) // CT-8: window elapsed with no cancel -> dial
     }
     @Test fun alternativeCannotSwitchPrimaryActionType() = runTest {
         val a = RecordingActuator()
