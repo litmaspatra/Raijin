@@ -44,8 +44,7 @@ class ContactResolver(
                 aliases = "",
                 phoneNumber = c.phoneNumber,
                 group = c.group.name,
-                numberLabel = c.numberLabel,
-            )
+            ).also { it.numberLabel = c.numberLabel }
         }
 
         // Learned entities carry aliases, so alias queries resolve here.
@@ -112,7 +111,9 @@ class ContactResolver(
         val counts = candidates.groupingBy { it.displayName.lowercase() }.eachCount()
         return candidates.map { e ->
             if (counts.getValue(e.displayName.lowercase()) > 1 && !e.numberLabel.isNullOrBlank()) {
+                // copy() drops the transient body property; re-attach it.
                 e.copy(displayName = "${e.displayName} (${e.numberLabel})")
+                    .also { it.numberLabel = e.numberLabel }
             } else e
         }
     }
