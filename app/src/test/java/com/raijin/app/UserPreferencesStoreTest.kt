@@ -81,4 +81,16 @@ class UserPreferencesStoreTest {
         store.preferredProviders = listOf("nvidia", "openai", "gemini")
         assertEquals(listOf("nvidia", "openai", "gemini"), store.preferredProviders)
     }
+
+    @Test
+    fun `system voice defaults to auto and pitch is clamped`() {
+        assertEquals(null, store.systemVoice)
+        assertEquals(1.0f, store.ttsPitch)
+        store.systemVoice = "en-in-x-abc-local"
+        assertEquals("en-in-x-abc-local", store.systemVoice)
+        store.systemVoice = null
+        assertEquals(null, store.systemVoice)
+        store.ttsPitch = 9f
+        assertEquals(2.0f, store.ttsPitch)
+    }
 }

@@ -19,6 +19,8 @@ import java.util.UUID
  */
 class RaijinTTS(context: Context) {
 
+    private val appContext = context.applicationContext
+
     companion object {
         private const val TAG = "RaijinTTS"
 
@@ -101,7 +103,33 @@ class RaijinTTS(context: Context) {
         val id = UUID.randomUUID().toString()
         if (onDone != null) utteranceCallbacks[id] = onDone
 
+        applyOwnerVoice(locale)
+
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+    }
+
+    /** Owner's speed, pitch and voice (or the best installed voice) for this utterance. */
+    private fun applyOwnerVoice(locale: Locale) {
+        val engine = tts ?: return
+        try {
+            val prefs = com.raijin.app.prefs.UserPreferencesStore(appContext)
+            engine.setSpeechRate(prefs.ttsSpeed)
+            engine.setPitch(prefs.ttsPitch)
+            val installed = engine.voices.orEmpty()
+            val options = installed.map {
+                VoiceOption(
+                    name = it.name,
+                    languageTag = it.locale.toLanguageTag(),
+                    quality = it.quality,
+                    needsNetwork = it.isNetworkConnectionRequired,
+                    installed = !it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED),
+                )
+            }
+            val pick = VoiceChooser.resolve(options, locale.language, prefs.systemVoice)
+            installed.firstOrNull { it.name == pick?.name }?.let { engine.voice = it }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not apply owner voice settings: ${e.message}")
+        }
     }
 
     /** True while the native engine is mid-utterance. */
