@@ -104,6 +104,9 @@ class RaijinTTS(context: Context) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
     }
 
+    /** True while the native engine is mid-utterance. */
+    val isSpeaking: Boolean get() = tts?.isSpeaking == true
+
     fun stop() {
         utteranceCallbacks.clear()
         kokoroClient.stop()
