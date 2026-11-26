@@ -189,6 +189,18 @@ jobs:
             echo "::error::$(base64 -w0 /tmp/gradle-build.log)"
             exit 1
           }
+      - name: Upload debug APK
+        # Owner-approved throwaway signing (2026-11-26): the per-run debug key
+        # signs the APK, no secrets in this repo. Each run's APK has a
+        # DIFFERENT signature, so installing it over a previous CI build
+        # requires uninstalling first (local app data is lost on uninstall).
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: raijin-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Run lint (non-blocking — abortOnError=false)
         run: ./gradlew --no-daemon :app:lintDebug || true
       - name: Upload lint report
