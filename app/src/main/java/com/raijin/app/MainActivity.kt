@@ -261,6 +261,7 @@ private fun MasterSettingsAndCommandDeck(
     var knownAppAliases by remember { mutableStateOf(emptyList<com.raijin.app.apps.AppAliasEntity>()) }
     var knownCorrections by remember { mutableStateOf(emptyList<com.raijin.app.contact.CorrectionEntry>()) }
     var knownPatterns by remember { mutableStateOf(emptyList<com.raijin.app.memory.MemoryPatternEntity>()) }
+    var pendingReminders by remember { mutableStateOf(emptyList<com.raijin.app.reminder.ReminderEntity>()) }
     var editingFact by remember { mutableStateOf<MemoryFactEntity?>(null) }
     var showForgetEverything by remember { mutableStateOf(false) }
 
@@ -272,6 +273,9 @@ private fun MasterSettingsAndCommandDeck(
             knownAppAliases = try { db.appAliasDao().getAll() } catch (_: Exception) { emptyList() }
             knownCorrections = try { db.correctionEntryDao().all() } catch (_: Exception) { emptyList() }
             knownPatterns = try { db.memoryPatternDao().all() } catch (_: Exception) { emptyList() }
+            pendingReminders = try {
+                com.raijin.app.reminder.ReminderListing.pending(db.reminderDao().findAllUnfired())
+            } catch (_: Exception) { emptyList() }
         }
     }
 
@@ -1221,6 +1225,40 @@ private fun MasterSettingsAndCommandDeck(
                 DeckTab.MEMORY -> {
                     item {
                         // Memory Facts Card
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = RaijinSurface,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("⏰ REMINDERS", fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = RaijinBlueLight)
+                                    Text("${pendingReminders.size} pending", fontSize = 10.sp, color = RaijinTextDim)
+                                }
+                                if (pendingReminders.isEmpty()) {
+                                    Text("No pending reminders. Say 'remind me to ...' and it shows up here.", fontSize = 11.sp, color = RaijinTextDim)
+                                } else {
+                                    pendingReminders.forEach { reminder ->
+                                        com.raijin.app.ui.memory.ReminderRow(
+                                            text = reminder.text,
+                                            detail = com.raijin.app.reminder.ReminderListing.detail(reminder),
+                                            onCancel = {
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    val db = RaijinDatabase.getInstance(context)
+                                                    com.raijin.app.reminder.ReminderListing.cancel(context, db.reminderDao(), reminder)
+                                                    refreshDatabaseData()
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = RaijinSurface,

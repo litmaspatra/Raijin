@@ -371,7 +371,7 @@ class RaijinBrain(
                         ),
                         confidence = 0.95f,
                         risk = ActionRisk.LOW,
-                        vocalResponse = "Reminder set for ${intent.title}.$recurringNote$conditionalNote",
+                        vocalResponse = "Reminder set for ${intent.title}.$recurringNote$conditionalNote See it under Reminders in the app.",
                     )
                     execute(result)
                     result
