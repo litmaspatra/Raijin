@@ -52,6 +52,18 @@ class UserPreferencesStore(context: Context) {
             kokoroPrefs().edit().putFloat("speed", clamped).apply()
         }
 
+    /** Name of the chosen system TTS voice; null means "pick the best installed one". */
+    var systemVoice: String?
+        get() = prefs.getString(KEY_SYSTEM_VOICE, null)
+        set(value) {
+            if (value == null) prefs.edit().remove(KEY_SYSTEM_VOICE).apply()
+            else prefs.edit().putString(KEY_SYSTEM_VOICE, value).apply()
+        }
+
+    var ttsPitch: Float
+        get() = prefs.getFloat(KEY_TTS_PITCH, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_TTS_PITCH, value.coerceIn(0.5f, 2.0f)).apply()
+
     var confirmationStrictness: ConfirmationStrictness
         get() = ConfirmationStrictness.entries.firstOrNull {
             it.name == prefs.getString(KEY_CONFIRMATION, ConfirmationStrictness.BALANCED.name)
@@ -101,6 +113,8 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_LANGUAGE = "language"
         private const val KEY_TTS_VOICE = "tts_voice"
         private const val KEY_TTS_SPEED = "tts_speed"
+        private const val KEY_SYSTEM_VOICE = "system_tts_voice"
+        private const val KEY_TTS_PITCH = "tts_pitch"
         private const val KEY_CONFIRMATION = "confirmation_strictness"
         private const val KEY_PROTECTED_PATHS = "protected_paths"
         private const val KEY_QUIET_ENABLED = "quiet_hours_enabled"

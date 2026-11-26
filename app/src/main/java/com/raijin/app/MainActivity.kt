@@ -1394,6 +1394,14 @@ private fun MasterSettingsAndCommandDeck(
 
                         Spacer(Modifier.height(16.dp))
 
+                        // Phone voice picker (system TTS)
+                        run {
+                            val voiceStore = remember { com.raijin.app.prefs.UserPreferencesStore(context) }
+                            com.raijin.app.ui.prefs.SystemVoiceCard(context = context, store = voiceStore)
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
                         // ME-5: preferences card
                         run {
                             val prefsStore = remember { com.raijin.app.prefs.UserPreferencesStore(context) }
