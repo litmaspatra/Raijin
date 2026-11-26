@@ -31,6 +31,7 @@ import com.raijin.app.skill.AppSkillRuntime
 import com.raijin.app.skill.SkillEngine
 import com.raijin.app.skill.SkillInstallService
 import com.raijin.app.skill.SkillRunner
+import com.raijin.app.ui.island.IslandTapPolicy
 import com.raijin.app.ui.island.IslandState
 import com.raijin.app.ui.island.TraceLine
 import io.raijin.brain.RaijinBrain
@@ -1199,15 +1200,25 @@ class RaijinService : Service() {
 
     private fun onIslandTap() {
         val cur = _islandState.value
-        if (cur is IslandState.Idle) {
-            startVoiceCapture()
-        } else if (cur is IslandState.Listening) {
-            sttEngine.stop()
-            _islandState.value = IslandState.Idle
-            manageWakeLock(IslandState.Idle)
-        } else if (cur is IslandState.Done || cur is IslandState.Failed || cur is IslandState.MorningBrief) {
-            _islandState.value = IslandState.Idle
-            manageWakeLock(IslandState.Idle)
+        when (IslandTapPolicy.decide(cur, tts.isSpeaking)) {
+            IslandTapPolicy.Decision.STOP_SPEECH -> {
+                tts.stop()
+                if (cur is IslandState.Done || cur is IslandState.Failed || cur is IslandState.MorningBrief) {
+                    _islandState.value = IslandState.Idle
+                    manageWakeLock(IslandState.Idle)
+                }
+            }
+            IslandTapPolicy.Decision.START_LISTENING -> startVoiceCapture()
+            IslandTapPolicy.Decision.STOP_LISTENING -> {
+                sttEngine.stop()
+                _islandState.value = IslandState.Idle
+                manageWakeLock(IslandState.Idle)
+            }
+            IslandTapPolicy.Decision.DISMISS -> {
+                _islandState.value = IslandState.Idle
+                manageWakeLock(IslandState.Idle)
+            }
+            IslandTapPolicy.Decision.IGNORE -> Unit
         }
     }
 
