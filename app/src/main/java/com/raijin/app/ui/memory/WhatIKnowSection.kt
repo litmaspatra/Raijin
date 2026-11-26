@@ -82,6 +82,28 @@ fun MemoryFactRow(
 }
 
 @Composable
+fun ReminderRow(
+    text: String,
+    detail: String,
+    onCancel: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(RaijinBlack.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text, color = RaijinWhite, fontSize = 11.sp)
+            Text(detail, color = RaijinText, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+        }
+        TextButton(onClick = onCancel) { Text("Cancel", color = RaijinRed, fontSize = 11.sp) }
+    }
+}
+
+@Composable
 fun AliasRow(
     spokenForm: String,
     meaning: String,
