@@ -93,4 +93,11 @@ class UserPreferencesStoreTest {
         store.ttsPitch = 9f
         assertEquals(2.0f, store.ttsPitch)
     }
+
+    @Test
+    fun `online media lookup defaults on and can be switched off`() {
+        assertEquals(true, store.onlineMediaLookup)
+        store.onlineMediaLookup = false
+        assertEquals(false, store.onlineMediaLookup)
+    }
 }

@@ -2185,4 +2185,29 @@ class NotificationQueryParseTest {
         assertTrue(args.title.startsWith("Call Mom"), args.title)
         assertTrue(!args.title.contains("a.m", ignoreCase = true), args.title)
     }
+
+    @Test
+    fun videoAndOtherMusicPhrasesRoute() = runTest {
+        val cases = listOf(
+            "play a video of cats" to Pair(io.raijin.contract.MusicCommand.PLAY_VIDEO, "cats"),
+            "play video arijit singh live" to Pair(io.raijin.contract.MusicCommand.PLAY_VIDEO, "arijit singh live"),
+            "play tum hi ho video" to Pair(io.raijin.contract.MusicCommand.PLAY_VIDEO, "tum hi ho"),
+            "youtube lofi beats" to Pair(io.raijin.contract.MusicCommand.PLAY_VIDEO, "lofi beats"),
+            "play a video" to Pair(io.raijin.contract.MusicCommand.PLAY_VIDEO, null),
+            "play other music" to Pair(io.raijin.contract.MusicCommand.NEXT, null),
+            "play another song" to Pair(io.raijin.contract.MusicCommand.NEXT, null),
+            "play different music" to Pair(io.raijin.contract.MusicCommand.NEXT, null),
+            "play tum hi ho" to Pair(io.raijin.contract.MusicCommand.PLAY_QUERY, "tum hi ho"),
+            "play music" to Pair(io.raijin.contract.MusicCommand.PLAY, null),
+        )
+        for ((text, expected) in cases) {
+            val actuator = RecordingActuator()
+            val brain = RaijinBrain(FakeMemory(), actuator)
+            val res = brain.processUtterance(text, "mv-${text.hashCode()}")
+            assertEquals(ActionType.MUSIC_CONTROL, res.actionType, text)
+            val args = assertIs<ActionArgs.Music>(res.args)
+            assertEquals(expected.first, args.command, text)
+            assertEquals(expected.second, args.query, text)
+        }
+    }
 }
