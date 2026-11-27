@@ -315,6 +315,8 @@ class RaijinBrain(
                         MusicCommand.VOLUME_DOWN -> "Turning the volume down."
                         MusicCommand.NOW_PLAYING -> "Let me check what's playing."
                         MusicCommand.PLAY_SOMETHING -> "Picking something for you."
+                        MusicCommand.PLAY_VIDEO ->
+                            if (intent.query.isNullOrBlank()) "Opening YouTube." else "Looking up ${intent.query}."
                     }
                     val result = DispatchResult(
                         traceId = traceId,
@@ -1591,6 +1593,13 @@ private object ReflexParser {
             return ParsedIntent.TrackFeedback(MusicFeedback.MORE_LIKE_THIS)
         }
 
+        // "play other / another / different music": move on to something else.
+        if (otherMusic.matches(text.trim())) {
+            return ParsedIntent.Music(MusicCommand.NEXT)
+        }
+        // "play a video (of X)", "play X video", "youtube X": YouTube, not the music app.
+        parseVideoRequest(text.trim())?.let { return it }
+
         if (text.startsWith("play ", ignoreCase = true)) {
             val query = text.substring(5).trim()
             if (query.equals("music", ignoreCase = true)) {
@@ -1671,6 +1680,41 @@ private object ReflexParser {
     )
 
     private val bareClock = Regex("""^(\d{1,2}):(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?$""", RegexOption.IGNORE_CASE)
+
+    private val otherMusic = Regex(
+        """^(?:play\s+)?(?:some\s+)?(?:other|another|different|new)\s+(?:music|song|songs|track|gaana)(?:\s+please)?$|^(?:kuch\s+aur|dusra|doosra|dusri|koi\s+aur)\s+(?:gaana|song|music)?\s*(?:chalao|lagao|sunao)?$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val videoLead = Regex(
+        """^(?:play|watch|show)\s+(?:me\s+)?(?:a\s+|the\s+|some\s+)?videos?(?:\s+(?:of|on|for|about))?\s*(.*)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val videoTrail = Regex(
+        """^(?:play|watch)\s+(.+?)\s+videos?$|^(.+?)\s+(?:ka\s+)?video\s+(?:chalao|lagao|dikhao)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val youtubeLead = Regex(
+        """^(?:youtube|yt)\s+(?:pe\s+|par\s+|on\s+)?(.+?)(?:\s+(?:chalao|lagao|play))?$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun parseVideoRequest(text: String): ParsedIntent? {
+        videoLead.matchEntire(text)?.let { m ->
+            val q = m.groupValues[1].trim()
+            return ParsedIntent.Music(MusicCommand.PLAY_VIDEO, q.ifBlank { null })
+        }
+        videoTrail.matchEntire(text)?.let { m ->
+            val q = (m.groupValues[1].ifBlank { m.groupValues[2] }).trim()
+            if (q.isNotBlank()) return ParsedIntent.Music(MusicCommand.PLAY_VIDEO, q)
+        }
+        youtubeLead.matchEntire(text)?.let { m ->
+            val q = m.groupValues[1].trim()
+            if (q.isNotBlank() && q.lowercase() !in setOf("app", "music", "music app", "studio", "kids", "tv")) {
+                return ParsedIntent.Music(MusicCommand.PLAY_VIDEO, q)
+            }
+        }
+        return null
+    }
 
     private fun parseAlarm(text: String, now: ZonedDateTime): ParsedIntent? {
         val timePart = alarmSuffix.matchEntire(text)?.groupValues?.get(1)

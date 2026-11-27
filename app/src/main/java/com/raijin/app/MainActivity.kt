@@ -1398,6 +1398,12 @@ private fun MasterSettingsAndCommandDeck(
                         run {
                             val voiceStore = remember { com.raijin.app.prefs.UserPreferencesStore(context) }
                             com.raijin.app.ui.prefs.SystemVoiceCard(context = context, store = voiceStore)
+                            Spacer(Modifier.height(16.dp))
+                            var lookupOn by remember { mutableStateOf(voiceStore.onlineMediaLookup) }
+                            com.raijin.app.ui.prefs.OnlineLookupCard(
+                                enabled = lookupOn,
+                                onEnabled = { lookupOn = it; voiceStore.onlineMediaLookup = it },
+                            )
                         }
 
                         Spacer(Modifier.height(16.dp))

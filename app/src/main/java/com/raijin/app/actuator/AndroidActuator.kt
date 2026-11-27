@@ -805,12 +805,25 @@ class AndroidActuator(
                         (if (localMatch.track.artist.isNotBlank()) " by ${localMatch.track.artist}." else "."),
                 )
             }
+            // Background lookup (if on): first watch link opened in YouTube Music.
+            lookupAndOpen(playQuery, preferSong = true, musicApp = true)?.let { return it }
             val intent = Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
                 putExtra(SearchManager.QUERY, playQuery)
+                // Unstructured search hint so the streaming app searches and plays.
+                putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             return ActionResult.EXECUTED()
+        }
+
+        if (args.command == MusicCommand.PLAY_VIDEO) {
+            val q = args.query
+            if (q.isNullOrBlank()) return openYouTube(Uri.parse("https://www.youtube.com/"))
+            lookupAndOpen(q, preferSong = false, musicApp = false)?.let { return it }
+            return openYouTube(
+                Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q)),
+            )
         }
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -858,7 +871,7 @@ class AndroidActuator(
             // Unreachable: handled above; kept so the when stays exhaustive.
             MusicCommand.VOLUME_UP, MusicCommand.VOLUME_DOWN,
             MusicCommand.REPEAT, MusicCommand.NOW_PLAYING,
-            MusicCommand.PLAY_SOMETHING -> KeyEvent.KEYCODE_UNKNOWN
+            MusicCommand.PLAY_SOMETHING, MusicCommand.PLAY_VIDEO -> KeyEvent.KEYCODE_UNKNOWN
         }
 
         audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
@@ -866,6 +879,37 @@ class AndroidActuator(
         Log.d(TAG, "Dispatched media key code: $keyCode")
         return ActionResult.EXECUTED()
     }
+
+    /**
+     * Looks the query up in the background (YouTube search, query text only) and
+     * opens the first watch link in the right app. Null = lookup off, failed or
+     * empty: the caller falls back to the app's own search.
+     */
+    private suspend fun lookupAndOpen(query: String, preferSong: Boolean, musicApp: Boolean): ActionResult? {
+        if (!com.raijin.app.prefs.UserPreferencesStore(context).onlineMediaLookup) return null
+        val hits = withContext(Dispatchers.IO) { com.raijin.app.media.YouTubeLookup.search(query) }
+        val hit = hits?.let { com.raijin.app.media.YouTubeLookup.pick(it, preferSong) } ?: return null
+        val pkg = if (musicApp) "com.google.android.apps.youtube.music" else "com.google.android.youtube"
+        val uri = Uri.parse(if (musicApp) hit.musicWatchUrl else hit.watchUrl)
+        val result = openUriInApp(uri, pkg) ?: openUriInApp(uri, null) ?: return null
+        Log.i(TAG, "Lookup opened a watch link in ${if (musicApp) "YT Music" else "YouTube"}")
+        return ActionResult.EXECUTED("Playing ${hit.title}.")
+    }
+
+    private fun openUriInApp(uri: Uri, pkg: String?): ActionResult? = try {
+        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+            if (pkg != null) setPackage(pkg)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        ActionResult.EXECUTED()
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun openYouTube(uri: Uri): ActionResult =
+        openUriInApp(uri, "com.google.android.youtube") ?: openUriInApp(uri, null)
+            ?: ActionResult.FAILED("I couldn't open YouTube.")
 
     // ── Storage Management ────────────────────────────────────────────────────
 

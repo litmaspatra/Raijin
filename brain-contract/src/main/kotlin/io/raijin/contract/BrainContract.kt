@@ -94,6 +94,8 @@ enum class MusicCommand {
     NOW_PLAYING,
     /** MU-7: "play something" - taste-weighted pick from the local library. */
     PLAY_SOMETHING,
+    /** "play a video of X": open YouTube (not the music app); query null = just open YouTube. */
+    PLAY_VIDEO,
 }
 
 /** MU-8: owner feedback on the currently playing track. */

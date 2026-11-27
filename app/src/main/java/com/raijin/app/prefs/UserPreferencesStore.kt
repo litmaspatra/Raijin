@@ -64,6 +64,15 @@ class UserPreferencesStore(context: Context) {
         get() = prefs.getFloat(KEY_TTS_PITCH, 1.0f)
         set(value) = prefs.edit().putFloat(KEY_TTS_PITCH, value.coerceIn(0.5f, 2.0f)).apply()
 
+    /**
+     * Background lookup of the first YouTube result for "play <song>" / "play a video of X".
+     * Only the query text (and the IP address any web request carries) goes to youtube.com.
+     * Off = the app's own search opens instead.
+     */
+    var onlineMediaLookup: Boolean
+        get() = prefs.getBoolean(KEY_ONLINE_LOOKUP, true)
+        set(value) = prefs.edit().putBoolean(KEY_ONLINE_LOOKUP, value).apply()
+
     var confirmationStrictness: ConfirmationStrictness
         get() = ConfirmationStrictness.entries.firstOrNull {
             it.name == prefs.getString(KEY_CONFIRMATION, ConfirmationStrictness.BALANCED.name)
@@ -115,6 +124,7 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_TTS_SPEED = "tts_speed"
         private const val KEY_SYSTEM_VOICE = "system_tts_voice"
         private const val KEY_TTS_PITCH = "tts_pitch"
+        private const val KEY_ONLINE_LOOKUP = "online_media_lookup"
         private const val KEY_CONFIRMATION = "confirmation_strictness"
         private const val KEY_PROTECTED_PATHS = "protected_paths"
         private const val KEY_QUIET_ENABLED = "quiet_hours_enabled"
