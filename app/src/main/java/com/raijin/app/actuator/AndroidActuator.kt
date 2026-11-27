@@ -893,7 +893,7 @@ class AndroidActuator(
         val uri = Uri.parse(if (musicApp) hit.musicWatchUrl else hit.watchUrl)
         val result = openUriInApp(uri, pkg) ?: openUriInApp(uri, null) ?: return null
         Log.i(TAG, "Lookup opened a watch link in ${if (musicApp) "YT Music" else "YouTube"}")
-        return ActionResult.EXECUTED("Playing ${hit.title}.")
+        return ActionResult.EXECUTED(hit.spoken)
     }
 
     private fun openUriInApp(uri: Uri, pkg: String?): ActionResult? = try {
