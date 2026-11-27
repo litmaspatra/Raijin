@@ -26,8 +26,30 @@ object HinglishTimeParser {
         val matchedFragment: String,
     )
 
+    private val MERIDIEM_SPOKEN = Regex("""(\d)\s*([ap])(?:\.\s?|\s)m\.?(?![A-Za-z0-9])""", RegexOption.IGNORE_CASE)
+    private val NUMBER_WORD_MERIDIEM = Regex(
+        """\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val HOUR_WORDS = listOf(
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+    )
+
+    /**
+     * Voice transcripts write "9:00 a.m." / "6 p.m." / "9 a m". Rewrite those to
+     * "9:00 am" / "6 pm" (and "nine am" to "9 am") so the clock time is read
+     * instead of falling back to a time-of-day word's default hour.
+     */
+    fun normalizeMeridiem(text: String): String {
+        var out = MERIDIEM_SPOKEN.replace(text) { m -> "${m.groupValues[1]} ${m.groupValues[2].lowercase()}m" }
+        out = NUMBER_WORD_MERIDIEM.replace(out) { m ->
+            "${HOUR_WORDS.indexOf(m.groupValues[1].lowercase()) + 1} ${m.groupValues[2].lowercase()}"
+        }
+        return out
+    }
+
     fun parse(text: String, now: ZonedDateTime): Parsed? {
-        val t = " " + text.lowercase().replace(Regex("[^a-z0-9:. ]"), " ").replace(Regex("\\s+"), " ").trim() + " "
+        val t = " " + normalizeMeridiem(text).lowercase().replace(Regex("[^a-z0-9:. ]"), " ").replace(Regex("\\s+"), " ").trim() + " "
 
         parseRelative(t, now)?.let { return it }
         return parseAbsolute(t, now)

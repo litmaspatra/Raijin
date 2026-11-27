@@ -1863,7 +1863,10 @@ private object ReflexParser {
         return cleaned
     }
 
-    private fun parseGeneralReminder(text: String, now: ZonedDateTime): ParsedIntent? {
+    private fun parseGeneralReminder(rawText: String, now: ZonedDateTime): ParsedIntent? {
+        // Transcripts say "9:00 a.m."; read it as "9:00 am" so the stated hour wins
+        // over a time-of-day word's default and the title strip finds it.
+        val text = HinglishTimeParser.normalizeMeridiem(rawText)
         var body: String? = null
         val lower = text.lowercase()
         for (prefix in reminderPrefixes) {
