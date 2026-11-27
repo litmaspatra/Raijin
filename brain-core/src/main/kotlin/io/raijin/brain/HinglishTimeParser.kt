@@ -28,7 +28,7 @@ object HinglishTimeParser {
 
     private val MERIDIEM_SPOKEN = Regex("""(\d)\s*([ap])(?:\.\s?|\s)m\.?(?![A-Za-z0-9])""", RegexOption.IGNORE_CASE)
     private val NUMBER_WORD_MERIDIEM = Regex(
-        """\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b""",
+        """\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*([ap])(?:\.\s?|\s)?m\.?(?![A-Za-z0-9])""",
         RegexOption.IGNORE_CASE,
     )
     private val HOUR_WORDS = listOf(
@@ -43,7 +43,7 @@ object HinglishTimeParser {
     fun normalizeMeridiem(text: String): String {
         var out = MERIDIEM_SPOKEN.replace(text) { m -> "${m.groupValues[1]} ${m.groupValues[2].lowercase()}m" }
         out = NUMBER_WORD_MERIDIEM.replace(out) { m ->
-            "${HOUR_WORDS.indexOf(m.groupValues[1].lowercase()) + 1} ${m.groupValues[2].lowercase()}"
+            "${HOUR_WORDS.indexOf(m.groupValues[1].lowercase()) + 1} ${m.groupValues[2].lowercase()}m"
         }
         return out
     }
