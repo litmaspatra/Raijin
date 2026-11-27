@@ -45,4 +45,16 @@ class YouTubeLookupTest {
         assertTrue(YouTubeLookup.parseHits("not json").isEmpty())
         assertTrue(YouTubeLookup.parseHits("{}").isEmpty())
     }
+
+    @Test fun spokenNamesTitleAndChannel() {
+        assertEquals("Playing Song, from Artist - Topic.", VideoHit("a", "Song", 200, "Artist - Topic").spoken)
+        assertEquals("Playing Song.", VideoHit("a", "Song", 200).spoken)
+    }
+
+    @Test fun parsesChannelFromOwnerText() {
+        val json = """{"x":{"videoRenderer":{"videoId":"abc","title":{"runs":[{"text":"Song"}]},""" +
+            """"lengthText":{"simpleText":"3:20"},"ownerText":{"runs":[{"text":"Some Channel"}]}}}}"""
+        val hit = YouTubeLookup.parseHits(json).single()
+        assertEquals("Some Channel", hit.channel)
+    }
 }

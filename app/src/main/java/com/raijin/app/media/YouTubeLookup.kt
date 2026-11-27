@@ -6,7 +6,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** One search hit: the watch id, its title and length in seconds (0 when unknown). */
-data class VideoHit(val videoId: String, val title: String, val lengthSeconds: Int) {
+data class VideoHit(
+    val videoId: String,
+    val title: String,
+    val lengthSeconds: Int,
+    /** Uploader/channel name when the response carries one (empty otherwise). */
+    val channel: String = "",
+) {
+    /** Spoken confirmation naming exactly what opened, so a wrong pick is easy to catch. */
+    val spoken: String get() = if (channel.isBlank()) "Playing $title." else "Playing $title, from $channel."
     val watchUrl: String get() = "https://www.youtube.com/watch?v=$videoId"
     val musicWatchUrl: String get() = "https://music.youtube.com/watch?v=$videoId"
 }
@@ -36,7 +44,9 @@ object YouTubeLookup {
                                 if (runs != null) for (i in 0 until runs.length()) append(runs.getJSONObject(i).optString("text"))
                             }
                             val length = parseLength(v.optJSONObject("lengthText")?.optString("simpleText"))
-                            out += VideoHit(id, title, length)
+                            val channel = v.optJSONObject("ownerText")?.optJSONArray("runs")
+                                ?.optJSONObject(0)?.optString("text").orEmpty()
+                            out += VideoHit(id, title, length, channel)
                         }
                     }
                     val keys = node.keys()
