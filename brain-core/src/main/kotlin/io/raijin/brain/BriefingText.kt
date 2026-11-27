@@ -33,6 +33,13 @@ object BriefingText {
         val count: Int,
         val snippet: String?,
         val kind: SummaryKind = if (snippet == null) SummaryKind.SUPPRESSED else SummaryKind.PREVIEW,
+        /** Notifications the on-device rules marked important / promotional (0 = not triaged). */
+        val importantCount: Int = 0,
+        val promoCount: Int = 0,
+        /** Sanitized one-liner of the newest important notification, if its body may be quoted. */
+        val importantSnippet: String? = null,
+        /** Plain-words description of the app ("email", "chat messages"), null when unknown. */
+        val appKind: String? = null,
     )
 
     private const val MAX_DIGEST_APPS = 3
@@ -47,19 +54,35 @@ object BriefingText {
         !connected -> "Notifications couldn't be checked. The notification listener isn't connected yet."
         digests.isEmpty() -> "No active notifications found. Messages without notifications aren't covered."
         else -> {
-            val shown = digests.take(MAX_DIGEST_APPS)
-            val parts = shown.map { d ->
-                when {
-                    d.snippet != null && d.count > 1 -> "${d.label}: ${d.snippet}, plus ${d.count - 1} more."
-                    d.snippet != null -> "${d.label}: ${d.snippet}."
-                    d.count == 1 -> "${d.label}: 1 notification."
-                    else -> "${d.label}: ${d.count} notifications."
-                }
-            }
+            val shown = digests.sortedByDescending { it.importantCount > 0 }.take(MAX_DIGEST_APPS)
+            val parts = shown.flatMap { d -> digestParts(d) }
             val rest = digests.size - shown.size
             val coverage = if (rest > 0) "And $rest more app(s) not summarized." else ""
             (parts + coverage).filter { it.isNotBlank() }.joinToString(" ")
         }
+    }
+
+    private fun digestParts(d: AppDigest): List<String> {
+        val name = if (d.appKind != null) "${d.label} (${d.appKind})" else d.label
+        if (d.importantCount == 0 && d.promoCount == 0) {
+            return listOf(
+                when {
+                    d.snippet != null && d.count > 1 -> "$name: ${d.snippet}, plus ${d.count - 1} more."
+                    d.snippet != null -> "$name: ${d.snippet}."
+                    d.count == 1 -> "$name: 1 notification."
+                    else -> "$name: ${d.count} notifications."
+                },
+            )
+        }
+        val out = mutableListOf<String>()
+        if (d.importantCount > 0) {
+            out += if (d.importantSnippet != null) "Important, $name: ${d.importantSnippet}."
+            else "Important, $name: ${d.importantCount} notification${if (d.importantCount > 1) "s" else ""}."
+        }
+        val other = d.count - d.importantCount - d.promoCount
+        if (other > 0) out += "$name: $other other."
+        if (d.promoCount > 0) out += "$name: ${d.promoCount} promotional."
+        return out
     }
 
     /**
