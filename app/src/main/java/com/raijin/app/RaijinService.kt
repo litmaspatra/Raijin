@@ -264,6 +264,7 @@ class RaijinService : Service() {
             memory = memoryAdapter,
             actuator = actuator,
             cloudReasoning = cloudClient,
+            speakSentence = { sentence -> tts.speakQueued(sentence) },
         )
         brainInstance = brain
 
@@ -331,7 +332,9 @@ class RaijinService : Service() {
                 }
 
                 // Vocalize conclusion if present
-                if (visualState is IslandVisualState.Done && visualState.feedbackLine.isNotBlank()) {
+                if (visualState is IslandVisualState.Done && visualState.feedbackLine.isNotBlank() &&
+                    !visualState.spokenAlready
+                ) {
                     tts.speak(visualState.feedbackLine)
                 }
 

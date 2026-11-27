@@ -86,7 +86,16 @@ class RaijinTTS(context: Context) {
         speakWithNativeTts(text, onDone)
     }
 
-    private fun speakWithNativeTts(text: String, onDone: ((Boolean) -> Unit)?) {
+    /**
+     * BR-7: queue a sentence behind whatever is already being spoken (no
+     * flush), so a streamed answer is read sentence by sentence.
+     */
+    fun speakQueued(text: String) {
+        if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        speakWithNativeTts(text, null, flush = false)
+    }
+
+    private fun speakWithNativeTts(text: String, onDone: ((Boolean) -> Unit)?, flush: Boolean = true) {
         if (!ready) {
             Log.w(TAG, "Native TTS not ready")
             onDone?.invoke(false)
@@ -105,7 +114,7 @@ class RaijinTTS(context: Context) {
 
         applyOwnerVoice(locale)
 
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        tts?.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, id)
     }
 
     /** Owner's speed, pitch and voice (or the best installed voice) for this utterance. */

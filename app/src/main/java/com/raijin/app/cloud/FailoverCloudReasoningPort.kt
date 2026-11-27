@@ -41,6 +41,34 @@ class FailoverCloudReasoningPort(
         prompt: String,
         systemPrompt: String?,
         temperature: Float,
+    ): String = runWithFailover { client -> client.complete(prompt, systemPrompt, temperature) }
+
+    /**
+     * BR-7: streams from the first working provider. Once text has started
+     * arriving it is already being shown and spoken, so a later failure
+     * returns what arrived instead of restarting on another provider.
+     */
+    override suspend fun completeStreaming(
+        prompt: String,
+        systemPrompt: String?,
+        temperature: Float,
+        onDelta: (String) -> Unit,
+    ): String {
+        val partial = StringBuilder()
+        return try {
+            runWithFailover { client ->
+                client.completeStreaming(prompt, systemPrompt, temperature) { d ->
+                    partial.append(d)
+                    onDelta(d)
+                }
+            }
+        } catch (e: Exception) {
+            if (partial.isNotBlank()) partial.toString().trim() else throw e
+        }
+    }
+
+    private suspend fun runWithFailover(
+        call: suspend (OpenAiCompatibleClient) -> String,
     ): String = withContext(Dispatchers.IO) {
         val statesById = registry.toPolicyStates()
         val plan = policy.plan(statesById.values.toList(), clock())
@@ -65,7 +93,7 @@ class FailoverCloudReasoningPort(
                 client = sharedHttpClient,
             )
             try {
-                val answer = client.complete(prompt, systemPrompt, temperature)
+                val answer = call(client)
                 registry.recordHealth(state.id, policy.onSuccess(state).toHealth())
                 if (state.id != plan.attempts.first().id) {
                     Log.i(TAG, "failover: '${state.id}' answered after earlier provider(s) failed")

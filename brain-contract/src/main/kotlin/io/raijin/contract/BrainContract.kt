@@ -588,6 +588,8 @@ sealed interface IslandVisualState {
 
     data class Done(
         val feedbackLine: String,
+        /** BR-7: the answer was already spoken sentence by sentence while streaming. */
+        val spokenAlready: Boolean = false,
     ) : IslandVisualState
 
     /**
@@ -754,6 +756,18 @@ interface CloudReasoningPort {
         systemPrompt: String? = null,
         temperature: Float = 0.7f,
     ): String
+
+    /**
+     * BR-7: same as [complete] but reports text as it arrives. The default
+     * simply delivers the whole answer at once, so ports that cannot stream
+     * keep working. Returns the full answer.
+     */
+    suspend fun completeStreaming(
+        prompt: String,
+        systemPrompt: String? = null,
+        temperature: Float = 0.7f,
+        onDelta: (String) -> Unit,
+    ): String = complete(prompt, systemPrompt, temperature).also { if (it.isNotEmpty()) onDelta(it) }
 }
 
 // ---- MU-6: local, interpretable music preference model ---------------------
