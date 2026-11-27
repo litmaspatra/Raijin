@@ -50,6 +50,7 @@ class HudOverlay(private val context: Context) {
         onTap: () -> Unit,
         onAction: (traceId: String, actionId: String, payload: String) -> Unit,
         onDismiss: (() -> Unit)? = null,
+        onLongPress: (() -> Unit)? = null,
     ) {
         if (isAttached) return
         lifecycleOwner.start()
@@ -65,6 +66,7 @@ class HudOverlay(private val context: Context) {
                         onTap = onTap,
                         onAction = onAction,
                         onDismiss = onDismiss,
+                        onLongPress = onLongPress,
                     )
                 }
             }

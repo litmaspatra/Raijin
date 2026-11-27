@@ -280,6 +280,16 @@ jobs:
               print("::error::zero unit tests recorded in XML - treating as broken signal")
               sys.exit(1)
           PY
+      - name: Upload staging renders (owner inspection)
+        # Robolectric renders of NEW UI states, kept even on green so the
+        # owner can inspect pixels before any baseline is recorded.
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-renders
+          path: app/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Save Gradle dependency cache
         # Explicit save: the combined cache action only saves on job success,
         # which the expected-red Paparazzi step would otherwise prevent

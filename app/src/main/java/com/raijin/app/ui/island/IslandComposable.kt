@@ -9,6 +9,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -29,12 +31,15 @@ import com.raijin.app.ui.theme.*
 
 private val IslandShape = RoundedCornerShape(50)
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun IslandComposable(
     state: IslandState,
     onTap: () -> Unit,
     onAction: (traceId: String, actionId: String, payload: String) -> Unit,
     modifier: Modifier = Modifier,
+    /** UI-6: long-press opens the type window (null = long-press does nothing). */
+    onLongPress: (() -> Unit)? = null,
     /** UI-5: dismiss affordance for the long-answer card; defaults to collapse. */
     onDismiss: (() -> Unit)? = null,
     /** Test hook: render the long-answer card pre-expanded (snapshot tests). */
@@ -79,7 +84,7 @@ fun IslandComposable(
             .clip(shape)
             .background(RaijinSurfaceGlass)
             .border(hudBorder, shape)
-            .clickable(onClick = onTap)
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
             .animateContentSize(
                 animationSpec = if (reduceMotion) snap()
                 else spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)

@@ -312,6 +312,7 @@ class RaijinService : Service() {
             onTap     = ::onIslandTap,
             onAction  = ::onIslandAction,
             onDismiss = { _islandState.value = IslandState.Idle },
+            onLongPress = ::openTypeWindow,
         )
 
         // 5. Connect Brain visual state stream directly to HUD
@@ -480,6 +481,14 @@ class RaijinService : Service() {
                 onError = { windowJob.cancel() },
             )
         }
+    }
+
+    /** UI-6: open the floating "Type to Raijin" window. */
+    private fun openTypeWindow() {
+        startActivity(
+            Intent(this, TypeToRaijinActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     fun startVoiceCapture() {
@@ -1372,9 +1381,9 @@ class RaijinService : Service() {
             Intent(this, RaijinService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        val briefIntent = PendingIntent.getService(
-            this, 2,
-            Intent(this, RaijinService::class.java).setAction(ACTION_TRIGGER_BRIEF),
+        val typeIntent = PendingIntent.getActivity(
+            this, 4,
+            Intent(this, TypeToRaijinActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE,
         )
         val voiceIntent = PendingIntent.getService(
@@ -1388,7 +1397,7 @@ class RaijinService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(tapIntent)
             .addAction(android.R.drawable.ic_btn_speak_now, "Talk", voiceIntent)
-            .addAction(android.R.drawable.ic_menu_today, "Briefing", briefIntent)
+            .addAction(android.R.drawable.ic_menu_edit, "Type", typeIntent)
             .addAction(android.R.drawable.ic_delete, "Stand Down", stopIntent)
             .setOngoing(true)
             .setSilent(true)
