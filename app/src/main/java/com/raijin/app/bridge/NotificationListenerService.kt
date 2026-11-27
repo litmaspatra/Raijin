@@ -45,6 +45,8 @@ class NotificationListenerService : NotificationListenerService() {
             val snippet: String?,
             val kind: io.raijin.brain.BriefingText.SummaryKind,
             val postTimeMs: Long,
+            val importance: io.raijin.brain.NotificationTriage.Importance =
+                io.raijin.brain.NotificationTriage.Importance.NORMAL,
         )
 
         /** NT-1: ring buffer (60) + 7-day retention, JVM-tested in NotificationCacheTest. */
@@ -67,7 +69,12 @@ class NotificationListenerService : NotificationListenerService() {
                 .groupBy { it.pkg }
                 .map { (_, list) ->
                     val newest = list.maxByOrNull { it.postTimeMs }
+                    val important = list.filter { it.importance == io.raijin.brain.NotificationTriage.Importance.IMPORTANT }
                     io.raijin.brain.BriefingText.AppDigest(
+                        importantCount = important.size,
+                        promoCount = list.count { it.importance == io.raijin.brain.NotificationTriage.Importance.PROMO },
+                        importantSnippet = important.maxByOrNull { it.postTimeMs }?.snippet,
+                        appKind = io.raijin.brain.NotificationTriage.appKind(newest?.pkg ?: list.first().pkg),
                         label = newest?.appLabel ?: list.first().pkg,
                         count = list.size,
                         snippet = newest?.snippet,
@@ -188,6 +195,12 @@ class NotificationListenerService : NotificationListenerService() {
                 snippet = snippet,
                 kind = kind,
                 postTimeMs = sbn.postTime,
+                // Chat apps stay content-blind: no importance label from message text.
+                importance = if (suppressed) {
+                    io.raijin.brain.NotificationTriage.Importance.NORMAL
+                } else {
+                    io.raijin.brain.NotificationTriage.classify("$title $text")
+                },
             ),
         )
     }
