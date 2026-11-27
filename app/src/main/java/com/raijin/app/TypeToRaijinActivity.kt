@@ -26,6 +26,10 @@ import com.raijin.app.ui.theme.RaijinTheme
 class TypeToRaijinActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // UI-8: shared text only pre-fills the window; nothing runs until Send.
+        val shared = if (intent?.action == android.content.Intent.ACTION_SEND) {
+            com.raijin.app.ui.ShareCompose.clean(intent.getCharSequenceExtra(android.content.Intent.EXTRA_TEXT))
+        } else null
         setContent {
             RaijinTheme {
                 var text by remember { mutableStateOf("") }
@@ -36,13 +40,14 @@ class TypeToRaijinActivity : ComponentActivity() {
                         text = text,
                         onTextChange = { text = it },
                         onSend = {
-                            if (text.isNotBlank()) {
-                                RaijinService.dispatchUtterance(text.trim())
+                            if (com.raijin.app.ui.ShareCompose.canSend(text, shared)) {
+                                RaijinService.dispatchUtterance(com.raijin.app.ui.ShareCompose.compose(text, shared))
                                 finish()
                             }
                         },
                         onClose = { finish() },
                         focusRequester = focus,
+                        sharedPreview = shared,
                     )
                 }
             }

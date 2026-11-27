@@ -78,11 +78,19 @@
         <!-- Main entry: Settings & Tactical Command Deck -->
         <activity
             android:name=".TypeToRaijinActivity"
-            android:exported="false"
+            android:exported="true"
+            android:label="Raijin"
             android:theme="@style/Theme.Raijin.TypeWindow"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop">
+            <!-- UI-8: Share target. Shared text only pre-fills the window; nothing runs until the owner taps Send. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:exported="true"

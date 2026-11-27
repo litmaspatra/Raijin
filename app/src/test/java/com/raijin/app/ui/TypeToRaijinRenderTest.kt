@@ -43,6 +43,15 @@ class TypeToRaijinRenderTest {
         save("type-to-raijin-text")
     }
 
+    @Test fun sharedText() {
+        compose.setContent {
+            RaijinTheme {
+                TypeToRaijinCard("", {}, {}, {}, sharedPreview = "Electricity bill of Rs 1,240 is due on Friday. Pay before the 30th to avoid a late fee.")
+            }
+        }
+        save("share-to-raijin")
+    }
+
     @Test fun sendButtonCallsBack() {
         var sent = false
         compose.setContent { RaijinTheme { TypeToRaijinCard("open whatsapp", {}, { sent = true }, {}) } }
