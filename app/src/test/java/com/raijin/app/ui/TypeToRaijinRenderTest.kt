@@ -11,7 +11,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import kotlin.test.assertTrue
+import org.junit.Assert.assertTrue
 
 /** UI-6 staging render (for owner inspection) plus a send-wiring check. */
 @RunWith(RobolectricTestRunner::class)
