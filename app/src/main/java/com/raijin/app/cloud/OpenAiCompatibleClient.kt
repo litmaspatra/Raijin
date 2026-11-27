@@ -144,6 +144,73 @@ class OpenAiCompatibleClient(
     }
 
     /**
+     * BR-7: streams the answer (OpenAI-style SSE, `stream: true`) and reports
+     * each text delta. Same URL, key, headers and error handling as [complete].
+     */
+    override suspend fun completeStreaming(
+        prompt: String,
+        systemPrompt: String?,
+        temperature: Float,
+        onDelta: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        val config = configProvider()
+        val endpointUrl = normalizeChatCompletionsUrl(config.baseUrl)
+        val messages = JSONArray().apply {
+            if (!systemPrompt.isNullOrBlank()) {
+                put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+            }
+            put(JSONObject().apply { put("role", "user"); put("content", prompt) })
+        }
+        val payload = JSONObject().apply {
+            put("model", config.model)
+            put("messages", messages)
+            put("temperature", temperature.toDouble())
+            put("stream", true)
+        }
+        val builder = Request.Builder()
+            .url(endpointUrl)
+            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Accept", "text/event-stream")
+        if (config.apiKey.isNotBlank()) builder.addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
+        if (config.baseUrl.contains("openrouter.ai")) {
+            builder.addHeader("HTTP-Referer", "https://github.com/litmaspatra/raijin")
+            builder.addHeader("X-Title", "Raijin Personal Assistant")
+        }
+        val response = try {
+            httpClient.newCall(builder.build()).execute()
+        } catch (e: IOException) {
+            throw IOException("Failed to connect to ${config.baseUrl}: ${e.message}", e)
+        }
+        response.use { resp ->
+            if (!resp.isSuccessful) {
+                val errBody = resp.body?.string().orEmpty()
+                val msg = when (resp.code) {
+                    401 -> "Authentication failed: Invalid API key for provider."
+                    403 -> "Access forbidden: Check model permissions or endpoint."
+                    429 -> "Rate limit or quota exceeded on cloud provider."
+                    500, 502, 503 -> "Provider server error (${resp.code}). Please try again later."
+                    else -> "Cloud error (${resp.code}): ${parseErrorMessage(errBody)}"
+                }
+                val retryAfterMs = resp.header("Retry-After")?.trim()?.toLongOrNull()?.times(1000L)
+                throw CloudCallException(msg, httpCode = resp.code, retryAfterMs = retryAfterMs)
+            }
+            val source = resp.body?.source() ?: throw IOException("Empty streaming response")
+            val full = StringBuilder()
+            while (true) {
+                val line = source.readUtf8Line() ?: break
+                when (val ev = SseParser.parseLine(line)) {
+                    is SseParser.Event.Delta -> { full.append(ev.text); onDelta(ev.text) }
+                    SseParser.Event.Done -> break
+                    SseParser.Event.Ignore -> Unit
+                }
+            }
+            if (full.isEmpty()) throw IOException("Streaming response carried no text")
+            full.toString().trim()
+        }
+    }
+
+    /**
      * Fetches the live list of model IDs available on this OpenAI-compatible endpoint.
      */
     suspend fun fetchModels(): Pair<Boolean, List<String>> = withContext(Dispatchers.IO) {

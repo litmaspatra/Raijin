@@ -865,6 +865,46 @@ class RaijinBrainTest {
     }
 
     @Test
+    fun streamedCloudAnswerIsSpokenSentenceBySentenceAndNotRepeated() = runTest {
+        val streamingCloud = object : CloudReasoningPort {
+            override val isConfigured: Boolean = true
+            override suspend fun complete(prompt: String, systemPrompt: String?, temperature: Float): String = "unused"
+            override suspend fun completeStreaming(
+                prompt: String, systemPrompt: String?, temperature: Float, onDelta: (String) -> Unit,
+            ): String {
+                listOf("Entanglement links two particles. ", "Measuring one ", "tells you about the other. ", "Neat").forEach(onDelta)
+                return "Entanglement links two particles. Measuring one tells you about the other. Neat"
+            }
+        }
+        val spoken = mutableListOf<String>()
+        val brain = RaijinBrain(
+            FakeMemory(), RecordingActuator(), cloudReasoning = streamingCloud,
+            speakSentence = { spoken += it },
+        )
+
+        brain.processUtterance("What is quantum entanglement?", "trace-stream")
+
+        assertEquals(
+            listOf("Entanglement links two particles.", "Measuring one tells you about the other.", "Neat"),
+            spoken,
+        )
+        val done = assertIs<IslandVisualState.Done>(brain.islandState.value)
+        assertTrue(done.spokenAlready)
+        assertEquals("Entanglement links two particles. Measuring one tells you about the other. Neat", done.feedbackLine)
+    }
+
+    @Test
+    fun nonStreamingBrainStillSpeaksViaDoneAsBefore() = runTest {
+        val cloud = object : CloudReasoningPort {
+            override val isConfigured: Boolean = true
+            override suspend fun complete(prompt: String, systemPrompt: String?, temperature: Float): String = "A plain answer here."
+        }
+        val brain = RaijinBrain(FakeMemory(), RecordingActuator(), cloudReasoning = cloud)
+        brain.processUtterance("What is quantum entanglement?", "trace-plain")
+        assertEquals(false, assertIs<IslandVisualState.Done>(brain.islandState.value).spokenAlready)
+    }
+
+    @Test
     fun followUpQuestionCarriesRecentSessionTurnsToCloud() = runTest {
         val prompts = mutableListOf<String>()
         val recordingCloud = object : CloudReasoningPort {

@@ -43,6 +43,8 @@ class RaijinBrain(
     private val cloudReasoning: CloudReasoningPort? = null,
     private val actuatorTimeoutMillis: Long = 30_000L,
     private val callCountdownMillis: Long = 2_000L,
+    /** BR-7: speaks one finished sentence of a streaming answer (null = no streaming speech). */
+    private val speakSentence: ((String) -> Unit)? = null,
 ) : RaijinBrainBridge {
     private val _islandState = MutableStateFlow<IslandVisualState>(IslandVisualState.Idle)
     override val islandState: StateFlow<IslandVisualState> = _islandState.asStateFlow()
@@ -517,15 +519,33 @@ class RaijinBrain(
                                 mode = ProcessingMode.CLOUD_GENERAL,
                             ),
                         )
+                        var spokeWhileStreaming = false
                         val answer = try {
                             // BR-9: per-request context — follow-ups carry up to
                             // the last 3 session turns; anything else sends the
                             // current message unchanged. Approved owner wording
                             // lives in the PR body / STATUS.md.
-                            cloudReasoning.complete(
+                            val chunker = SentenceChunker()
+                            val speak = speakSentence
+                            val full = cloudReasoning.completeStreaming(
                                 prompt = SessionContextPrompt.build(rawText, sessionTurns),
                                 systemPrompt = Persona.systemPrompt,
-                            )
+                            ) { delta ->
+                                if (speak != null) {
+                                    for (sentence in chunker.feed(delta)) {
+                                        spokeWhileStreaming = true
+                                        speak(sentence)
+                                        _islandState.value = IslandVisualState.Thinking(taskLabel = sentence, mode = ProcessingMode.CLOUD_GENERAL)
+                                    }
+                                }
+                            }
+                            if (speak != null) {
+                                for (sentence in chunker.finish()) {
+                                    spokeWhileStreaming = true
+                                    speak(sentence)
+                                }
+                            }
+                            full
                         } catch (e: Exception) {
                             emit(IslandVisualState.Failed(errorReason = "Cloud request failed: ${e.message}", recoverable = true))
                             return@track DispatchResult(
@@ -535,7 +555,7 @@ class RaijinBrain(
                                 vocalResponse = "Cloud reasoning encountered an error.",
                             )
                         }
-                        emit(IslandVisualState.Done(feedbackLine = answer))
+                        emit(IslandVisualState.Done(feedbackLine = answer, spokenAlready = spokeWhileStreaming))
                         sessionTurns.record(
                             SessionTurn(rawText, answer, System.currentTimeMillis()),
                         )
