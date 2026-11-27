@@ -2155,4 +2155,34 @@ class NotificationQueryParseTest {
         assertEquals(ActionType.READ_NOTIFICATIONS, res.actionType)
         assertNull(assertIs<ActionArgs.NotificationQuery>(res.args).appFilter)
     }
+
+    @Test
+    fun dottedAmAlarmKeepsTheStatedHour() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        for ((text, hour) in listOf(
+            "set an alarm for 8 a.m." to 8,
+            "set an alarm for 9:00 a.m." to 9,
+            "set alarm at 6:30 p.m." to 18,
+            "wake me up at 9 a.m." to 9,
+        )) {
+            val res = brain.processUtterance(text, "al-$hour")
+            assertEquals(ActionType.SET_ALARM, res.actionType, text)
+            assertEquals(hour, assertIs<ActionArgs.Alarm>(res.args).hour, text)
+        }
+    }
+
+    @Test
+    fun dottedAmReminderKeepsHourAndCleanTitle() = runTest {
+        val actuator = RecordingActuator()
+        val brain = RaijinBrain(FakeMemory(), actuator)
+        val res = brain.processUtterance("remind me to Call Mom tomorrow morning at 9:00 a.m.", "rm1")
+        assertEquals(ActionType.CREATE_REMINDER, res.actionType)
+        val args = assertIs<ActionArgs.Reminder>(res.args)
+        val hour = java.time.Instant.ofEpochMilli(args.triggerAtEpochMillis)
+            .atZone(java.time.ZoneId.systemDefault()).hour
+        assertEquals(9, hour)
+        assertTrue(args.title.startsWith("Call Mom"), args.title)
+        assertTrue(!args.title.contains("a.m", ignoreCase = true), args.title)
+    }
 }

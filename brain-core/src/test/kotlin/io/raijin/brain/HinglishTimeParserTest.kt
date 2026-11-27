@@ -177,4 +177,23 @@ class HinglishTimeParserTest {
         assertNotNull(p)
         assertEquals(at(12, 9, 0), p.triggerAt)
     }
+
+    // ---------------- Voice-transcript meridiem forms (a.m. / p.m.) ----------------
+    // Regression: "9:00 a.m." was not read, so "morning" fell back to its 7:00 default.
+
+    @Test fun dotted_am_beats_morning_default() = expect("tomorrow morning at 9:00 a.m.", at(12, 9, 0))
+    @Test fun dotted_pm_beats_evening_default() = expect("tomorrow evening at 6:30 p.m.", at(12, 18, 30))
+    @Test fun dotted_evening_at_8_pm() = expect("tomorrow evening at 8:00 p.m.", at(12, 20, 0))
+    @Test fun dotted_am_bare_hour() = expect("tomorrow at 8 a.m.", at(12, 8, 0))
+    @Test fun spaced_am_letters() = expect("tomorrow morning 9 a m", at(12, 9, 0))
+    @Test fun uppercase_dotted() = expect("tomorrow morning at 9:00 A.M.", at(12, 9, 0))
+    @Test fun plain_am_still_works() = expect("tomorrow morning at 9 am", at(12, 9, 0))
+    @Test fun number_word_am() = expect("tomorrow nine a.m.", at(12, 9, 0))
+    @Test fun daypart_only_keeps_default() = expect("kal subah", at(12, 7, 0))
+    @Test fun every_hour_dotted_am_and_pm() {
+        for (h in 1..12) {
+            expect("tomorrow at $h:00 a.m.", at(12, h % 12, 0))
+            expect("tomorrow at $h:00 p.m.", at(12, h % 12 + 12, 0))
+        }
+    }
 }
