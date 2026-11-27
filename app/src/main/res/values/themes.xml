@@ -22,4 +22,12 @@
         <item name="android:backgroundDimEnabled">false</item>
     </style>
 
+    <!-- Type-to-Raijin: small floating window over whatever app is open -->
+    <style name="Theme.Raijin.TypeWindow" parent="Theme.Raijin">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowSoftInputMode">adjustResize|stateVisible</item>
+    </style>
+
 </resources>
