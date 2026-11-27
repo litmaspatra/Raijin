@@ -45,6 +45,8 @@ fun TypeToRaijinCard(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    /** UI-8: text shared into Raijin, shown read-only under the field. */
+    sharedPreview: String? = null,
 ) {
     Surface(shape = RoundedCornerShape(16.dp), color = RaijinSurface, modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -56,7 +58,7 @@ fun TypeToRaijinCard(
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
-                label = { Text("What should I do?", fontSize = 12.sp) },
+                label = { Text(if (sharedPreview != null) "What should I do with this?" else "What should I do?", fontSize = 12.sp) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RaijinBlue,
                     unfocusedBorderColor = RaijinBorderDim,
@@ -72,11 +74,15 @@ fun TypeToRaijinCard(
                     if (focusRequester != null) m.focusRequester(focusRequester) else m
                 },
             )
+            if (sharedPreview != null) {
+                Text("SHARED TEXT", fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = RaijinGold)
+                Text(sharedPreview, color = RaijinText, fontSize = 12.sp, maxLines = 4)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 TextButton(onClick = onClose) { Text("Cancel", color = RaijinText, fontSize = 12.sp) }
                 Button(
                     onClick = onSend,
-                    enabled = text.isNotBlank(),
+                    enabled = text.isNotBlank() || sharedPreview != null,
                     colors = ButtonDefaults.buttonColors(containerColor = RaijinBlueDim, contentColor = RaijinBlueLight),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.weight(1f),
