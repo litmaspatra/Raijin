@@ -222,7 +222,15 @@ class RaijinService : Service() {
             runCatching { database.memoryDao().purgeHot() }
         }
         val memoryAdapter = RoomRaijinMemoryAdapter(database.memoryDao(), database.appAliasDao(), permissionBroker,
-            com.raijin.app.contact.ContactResolver(permissionBroker, database.contactEntityDao(), database.correctionEntryDao()))
+            com.raijin.app.contact.ContactResolver(
+                permissionBroker, database.contactEntityDao(), database.correctionEntryDao(),
+                historySignals = {
+                    // CT-5: call-history ranking, on-device, owner-switchable in Settings.
+                    if (com.raijin.app.prefs.UserPreferencesStore(applicationContext).useContactHistory)
+                        com.raijin.app.contact.CallHistorySignals.load(applicationContext)
+                    else emptyMap()
+                },
+            ))
         // ME-5: STRICT confirmation mode asks before reversible actions.
         // Strictness only ADDS asks; egress, install and dangerous-permission
         // consents are never relaxed by any strictness level.

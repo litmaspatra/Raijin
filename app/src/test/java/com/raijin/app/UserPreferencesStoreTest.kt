@@ -100,4 +100,11 @@ class UserPreferencesStoreTest {
         store.onlineMediaLookup = false
         assertEquals(false, store.onlineMediaLookup)
     }
+
+    @Test
+    fun `contact history ranking defaults on and can be switched off`() {
+        assertEquals(true, store.useContactHistory)
+        store.useContactHistory = false
+        assertEquals(false, store.useContactHistory)
+    }
 }

@@ -1404,6 +1404,18 @@ private fun MasterSettingsAndCommandDeck(
                                 enabled = lookupOn,
                                 onEnabled = { lookupOn = it; voiceStore.onlineMediaLookup = it },
                             )
+                            Spacer(Modifier.height(16.dp))
+                            var historyOn by remember { mutableStateOf(voiceStore.useContactHistory) }
+                            var historyGranted by remember { mutableStateOf(com.raijin.app.contact.CallHistorySignals.hasPermission(context)) }
+                            val historyLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                            ) { granted -> historyGranted = granted }
+                            com.raijin.app.ui.prefs.ContactHistoryCard(
+                                enabled = historyOn,
+                                permissionGranted = historyGranted,
+                                onEnabled = { historyOn = it; voiceStore.useContactHistory = it },
+                                onGrantPermission = { historyLauncher.launch(android.Manifest.permission.READ_CALL_LOG) },
+                            )
                         }
 
                         Spacer(Modifier.height(16.dp))

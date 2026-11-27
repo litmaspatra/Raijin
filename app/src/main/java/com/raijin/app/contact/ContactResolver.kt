@@ -19,6 +19,8 @@ class ContactResolver(
     private val permissionBroker: PermissionBroker,
     private val contactDao: ContactEntityDao,
     private val correctionDao: CorrectionEntryDao? = null,
+    /** CT-5: on-device call-history signals keyed by number (null/empty = no context). */
+    private val historySignals: (() -> Map<String, ContactScorer.ContextSignals>)? = null,
 ) : ContactResolverPort {
 
     override suspend fun resolve(query: String): ResolveResult = resolveAlternatives(listOf(query))
@@ -60,8 +62,14 @@ class ContactResolver(
 
         if (entries.isEmpty()) return ResolveResult.NotFound
 
-        val ranking = ContactScorer.rankEntries(entries, allQueries)
-            .distinctBy { entitiesByRef.getValue(it.contactId).phoneNumber }
+        val history = runCatching { historySignals?.invoke() }.getOrNull().orEmpty()
+        val signalsById: Map<String, ContactScorer.ContextSignals> = if (history.isEmpty()) emptyMap() else
+            entitiesByRef.mapNotNull { (ref, e) ->
+                history[CallHistorySignals.key(e.phoneNumber)]?.let { ref to it }
+            }.toMap()
+        val ranking = ContactScorer.rankEntriesWithContext(
+            entries, allQueries, signalsById, System.currentTimeMillis() / 1000L,
+        ).distinctBy { entitiesByRef.getValue(it.contactId).phoneNumber }
 
         // CT-7: contacts the owner has corrected for any of these spoken
         // forms are deprioritized; they only come back when nothing else
