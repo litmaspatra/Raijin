@@ -321,6 +321,14 @@ class RaijinService : Service() {
                 _islandState.value = uiState
                 manageWakeLock(uiState)
 
+                // UI-7: a clarifying question is spoken, then the mic reopens for 6 s
+                // with no tap. Confirmations/consents never auto-listen.
+                if (visualState is IslandVisualState.NeedsInput &&
+                    io.raijin.brain.FollowUpPolicy.shouldListen(visualState.kind)
+                ) {
+                    askAndListen(visualState.traceId, io.raijin.brain.FollowUpPolicy.spokenPrompt(visualState.prompt, visualState.options))
+                }
+
                 // Vocalize conclusion if present
                 if (visualState is IslandVisualState.Done && visualState.feedbackLine.isNotBlank()) {
                     tts.speak(visualState.feedbackLine)
@@ -440,6 +448,39 @@ class RaijinService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     // ── Voice Interaction Loop ──────────────────────────────────────────────
+
+    /**
+     * UI-7: speak a clarifying question, then listen once for
+     * [io.raijin.brain.FollowUpPolicy.WINDOW_MS]. The question card stays on
+     * screen (tap still works); silence just ends the listen.
+     */
+    private fun askAndListen(traceId: String, spoken: String) {
+        if (!permissionBroker.canRecordAudio()) {
+            tts.speak(spoken)
+            return
+        }
+        tts.speak(spoken) {
+            val stillAsking = (_islandState.value as? IslandState.NeedsInput)?.traceId == traceId
+            if (!stillAsking) return@speak
+            val windowJob = serviceScope.launch {
+                delay(io.raijin.brain.FollowUpPolicy.WINDOW_MS)
+                sttEngine.stop()
+            }
+            sttEngine.startListening(
+                onResult = { text ->
+                    windowJob.cancel()
+                    val stillOpen = (_islandState.value as? IslandState.NeedsInput)?.traceId == traceId
+                    if (text.isNotBlank() && stillOpen) {
+                        serviceScope.launch {
+                            try { brain.resolveClarification(traceId, text.trim()) }
+                            catch (e: Exception) { Log.w(TAG, "Follow-up answer failed: ${e.message}") }
+                        }
+                    }
+                },
+                onError = { windowJob.cancel() },
+            )
+        }
+    }
 
     fun startVoiceCapture() {
         if (!permissionBroker.canRecordAudio()) {
