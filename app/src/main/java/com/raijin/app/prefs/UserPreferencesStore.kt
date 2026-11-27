@@ -73,6 +73,14 @@ class UserPreferencesStore(context: Context) {
         get() = prefs.getBoolean(KEY_ONLINE_LOOKUP, true)
         set(value) = prefs.edit().putBoolean(KEY_ONLINE_LOOKUP, value).apply()
 
+    /**
+     * CT-5: rank contacts using the phone's own call history (how often, how
+     * recently, at this time of day). Read live on the phone, never stored or sent.
+     */
+    var useContactHistory: Boolean
+        get() = prefs.getBoolean(KEY_CONTACT_HISTORY, true)
+        set(value) = prefs.edit().putBoolean(KEY_CONTACT_HISTORY, value).apply()
+
     var confirmationStrictness: ConfirmationStrictness
         get() = ConfirmationStrictness.entries.firstOrNull {
             it.name == prefs.getString(KEY_CONFIRMATION, ConfirmationStrictness.BALANCED.name)
@@ -125,6 +133,7 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_SYSTEM_VOICE = "system_tts_voice"
         private const val KEY_TTS_PITCH = "tts_pitch"
         private const val KEY_ONLINE_LOOKUP = "online_media_lookup"
+        private const val KEY_CONTACT_HISTORY = "use_contact_history"
         private const val KEY_CONFIRMATION = "confirmation_strictness"
         private const val KEY_PROTECTED_PATHS = "protected_paths"
         private const val KEY_QUIET_ENABLED = "quiet_hours_enabled"

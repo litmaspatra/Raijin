@@ -89,4 +89,33 @@ class ContactContextBoostTest {
         val ranked = ContactScorer.rankWithContext(candidates, listOf("rahul sharma"), now)
         assertTrue(ranked[0].score <= 1.0)
     }
+
+    @Test
+    fun entryRankingPrefersTheOftenCalledContactOnATie() {
+        val entries = listOf(
+            ContactScorer.Entry("a", "Rahul Sharma"),
+            ContactScorer.Entry("b", "Rahul Verma"),
+        )
+        val signals = mapOf(
+            "b" to ContextSignals(callCount30d = 25, lastContactEpochSec = now - 3600, sameDaypartCount = 6),
+        )
+        val ranked = ContactScorer.rankEntriesWithContext(entries, listOf("rahul"), signals, now)
+        assertEquals("b", ranked.first().contactId)
+    }
+
+    @Test
+    fun entryRankingWithoutSignalsMatchesPlainRanking() {
+        val entries = listOf(ContactScorer.Entry("a", "Rahul Sharma"), ContactScorer.Entry("b", "Priya"))
+        val plain = ContactScorer.rankEntries(entries, listOf("rahul"))
+        val ctx = ContactScorer.rankEntriesWithContext(entries, listOf("rahul"), emptyMap(), now)
+        assertEquals(plain.map { it.contactId }, ctx.map { it.contactId })
+    }
+
+    @Test
+    fun contextNeverRescuesAnUnrelatedName() {
+        val entries = listOf(ContactScorer.Entry("a", "Zoya Khan"), ContactScorer.Entry("b", "Rahul"))
+        val signals = mapOf("a" to ContextSignals(callCount30d = 50, lastContactEpochSec = now - 60, isRecentMessageSender = true))
+        val ranked = ContactScorer.rankEntriesWithContext(entries, listOf("rahul"), signals, now)
+        assertEquals("b", ranked.first().contactId)
+    }
 }

@@ -94,6 +94,27 @@ object ContactScorer {
     }
 
     /**
+     * CT-5 for entries: phonetic ranking plus the on-device context boost per
+     * contact id ([signals]; a missing id means no signal). The sort uses the
+     * unclamped score so a boost can break a tie between equal exact matches.
+     */
+    fun rankEntriesWithContext(
+        entries: List<Entry>,
+        sttAlternatives: List<String>,
+        signals: Map<String, ContextSignals>,
+        nowEpochSec: Long,
+    ): List<Match> {
+        if (sttAlternatives.isEmpty()) return emptyList()
+        return entries.mapNotNull { e ->
+            bestMatchEntry(e, sttAlternatives)?.let { m ->
+                val boost = signals[e.contactId]?.let { contextBoost(it, m.score, nowEpochSec) } ?: 0.0
+                m to (m.score + boost)
+            }
+        }.sortedByDescending { it.second }
+            .map { (m, boosted) -> m.copy(score = minOf(1.0, boosted)) }
+    }
+
+    /**
      * CT-6 confidence bands: >= 0.85 with margin >= 0.15 proceeds,
      * 0.50-0.85 asks, below 0.50 is a miss.
      */
