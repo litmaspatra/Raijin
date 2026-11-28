@@ -1293,6 +1293,7 @@ private fun MasterSettingsAndCommandDeck(
                                 onEnabled = { shareCloud = it; voiceStore.shareContextWithCloud = it },
                             )
                             Spacer(Modifier.height(16.dp))
+                            com.raijin.app.ui.prefs.CrashReportCard()
                             val whisperStore = remember { com.raijin.app.audio.WhisperStore(context) }
                             var whisperOn by remember { mutableStateOf(whisperStore.enabled) }
                             com.raijin.app.ui.prefs.OnDeviceSpeechCard(

@@ -13,6 +13,8 @@ class RaijinApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.raijin.app.crash.CrashCapture.install(this)
+        com.raijin.app.crash.CrashCapture.collectExitReasons(this)
         createNotificationChannels()
         // ME-3: keep the daily pattern-mining chain alive.
         com.raijin.app.memory.PatternJobReceiver.scheduleNext(this)
