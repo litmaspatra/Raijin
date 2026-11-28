@@ -181,6 +181,21 @@ jobs:
           locale 2>/dev/null | head -3 || true
           fc-list 2>/dev/null | wc -l
           fc-list 2>/dev/null | grep -ciE 'devanagari|noto' || true
+      - name: Fetch Whisper source and model (pinned, checksum-verified, not committed)
+        # VO-2: whisper.cpp v1.8.7 (MIT) and the ggml base q5_1 model are fetched at
+        # build time; both are verified before use. The model is bundled into the APK
+        # as an asset. Nothing here needs a secret or paid resource.
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v1.8.7 https://github.com/ggml-org/whisper.cpp app/src/main/cpp/whisper.cpp
+          test "$(git -C app/src/main/cpp/whisper.cpp rev-parse HEAD)" = "48f628a84833905ee4a0658ee6d4a5c915ce1997"
+          rm -rf app/src/main/cpp/whisper.cpp/.git
+          mkdir -p app/src/main/assets/models
+          curl -fL --retry 3 --connect-timeout 15 -o app/src/main/assets/models/ggml-base-q5_1.bin \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin
+          echo "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898  app/src/main/assets/models/ggml-base-q5_1.bin" | sha256sum -c -
+          echo "RAIJIN_NDK_VERSION=$(basename "${ANDROID_NDK_LATEST_HOME:-}")" >> "$GITHUB_ENV"
+          ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake" || true
       - name: Assemble debug APK
         id: assemble
         run: |

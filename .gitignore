@@ -10,3 +10,7 @@ graphify-out/
 # SDD workspaces
 .superpowers/
 build-output/
+
+# VO-2: fetched by CI at build time (pinned + checksum-verified), never committed
+app/src/main/cpp/whisper.cpp/
+app/src/main/assets/models/

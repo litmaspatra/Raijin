@@ -19,3 +19,6 @@
 
 # Compose — keep all @Composable functions from being removed
 -keep class androidx.compose.** { *; }
+
+# VO-2: JNI entry points for on-device Whisper
+-keep class com.raijin.app.audio.WhisperNative { native <methods>; }
