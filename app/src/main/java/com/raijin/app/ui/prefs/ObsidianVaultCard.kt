@@ -49,7 +49,8 @@ fun ObsidianVaultCard(
             OutlinedTextField(
                 value = path,
                 onValueChange = onPathChange,
-                label = { Text("Vault folder", fontSize = 12.sp) },
+                label = { Text("Vault folder (full path)", fontSize = 12.sp) },
+                placeholder = { Text("/storage/emulated/0/<your vault>", fontSize = 12.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RaijinBlue,
