@@ -76,6 +76,8 @@ class RaijinService : Service() {
         private const val NOTIF_ID = 1
         private const val WAKE_TAG = "raijin:active"
         private const val VOICE_WATCHDOG_MS = 12_000L
+        // Whisper: up to 8 s waiting for speech, 20 s max speech, then CPU transcription.
+        private const val WHISPER_WATCHDOG_MS = 45_000L
 
         /** Start/stop actions for external control */
         const val ACTION_START          = "com.raijin.app.ACTION_START"
@@ -511,13 +513,20 @@ class RaijinService : Service() {
 
         // Watchdog: if the recognizer never calls back (OEM edge), the island
         // must not sit in a false Listening state forever.
+        val watchdogMs = if (sttEngine.usesWhisper()) WHISPER_WATCHDOG_MS else VOICE_WATCHDOG_MS
         serviceScope.launch {
-            delay(VOICE_WATCHDOG_MS)
+            delay(watchdogMs)
             if (_islandState.value is IslandState.Listening) {
-                Log.w(TAG, "Voice capture watchdog: still Listening after ${VOICE_WATCHDOG_MS}ms, resetting to Idle")
+                Log.w(TAG, "Voice capture watchdog: still Listening after ${watchdogMs}ms")
                 sttEngine.stop()
-                _islandState.value = IslandState.Idle
-                manageWakeLock(IslandState.Idle)
+                val msg = "Listening timed out with no result. Try again."
+                _islandState.value = IslandState.Failed(msg)
+                tts.speak(msg)
+                delay(4000L)
+                if (_islandState.value is IslandState.Failed) {
+                    _islandState.value = IslandState.Idle
+                    manageWakeLock(IslandState.Idle)
+                }
             }
         }
 
@@ -539,27 +548,23 @@ class RaijinService : Service() {
             },
             onError = { err ->
                 Log.w(TAG, "STT recognition error: $err")
-                // PRD UI-3: never silent on a real failure. Permission-class errors
-                // (9 = insufficient permissions, 5 = client/policy, the signatures of
-                // Android 12+ background-mic cuts) must tell the user what happened;
-                // timeout/no-match (6/7) are ordinary no-speech and stay quiet.
-                if (err == android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
-                    err == android.speech.SpeechRecognizer.ERROR_CLIENT
-                ) {
-                    val reason = "Mic is blocked while Raijin is in the background. Open Raijin once, then retry."
-                    _islandState.value = IslandState.Failed(reason)
-                    tts.speak("Boss, the microphone was cut off. Open Raijin once and try again.")
-                    manageWakeLock(IslandState.Failed(reason))
-                    serviceScope.launch {
-                        delay(3500L)
-                        if (_islandState.value is IslandState.Failed) {
-                            _islandState.value = IslandState.Idle
-                            manageWakeLock(IslandState.Idle)
-                        }
+                // PRD UI-3: never silent. Every failure shows and speaks its real reason.
+                val reason = com.raijin.app.audio.SttFailure.describe(err)
+                _islandState.value = IslandState.Failed(reason.text)
+                tts.speak(reason.text)
+                manageWakeLock(IslandState.Failed(reason.text))
+                if (reason.needsMainActivity) {
+                    val i = Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     }
-                } else {
-                    _islandState.value = IslandState.Idle
-                    manageWakeLock(IslandState.Idle)
+                    runCatching { startActivity(i) }
+                }
+                serviceScope.launch {
+                    delay(5000L)
+                    if (_islandState.value is IslandState.Failed) {
+                        _islandState.value = IslandState.Idle
+                        manageWakeLock(IslandState.Idle)
+                    }
                 }
             }
         )

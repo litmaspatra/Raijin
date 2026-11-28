@@ -56,7 +56,7 @@ class WhisperEngine(
 
     /** [language]: "en", "hi" or "auto". Callbacks arrive on the main thread. */
     @SuppressLint("MissingPermission")
-    fun startListening(language: String, onResult: (String) -> Unit, onError: () -> Unit) {
+    fun startListening(language: String, onResult: (String) -> Unit, onError: (Int) -> Unit) {
         stop()
         job = scope.launch(Dispatchers.Default) {
             val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -69,49 +69,80 @@ class WhisperEngine(
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "mic init failed: ${e.javaClass.simpleName}")
-                withContext(Dispatchers.Main) { onError() }
+                WhisperStore(context).lastProblem = "mic init failed: ${e.javaClass.simpleName}"
+                withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
                 return@launch
             }
             if (rec.state != AudioRecord.STATE_INITIALIZED) {
+                WhisperStore(context).lastProblem = "recorder not initialised (state ${rec.state})"
                 rec.release()
-                withContext(Dispatchers.Main) { onError() }
+                withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
                 return@launch
             }
             val pcm = ArrayList<ShortArray>()
             val ep = EnergyEndpointer()
+            var micProblem: String? = null
             try {
                 rec.startRecording()
-                val buf = ShortArray(frameSize)
-                while (isActive) {
-                    val n = rec.read(buf, 0, buf.size)
-                    if (n <= 0) break
-                    val chunk = buf.copyOf(n)
-                    pcm += chunk
-                    val s = ep.feed(chunk, n)
-                    if (s == EnergyEndpointer.State.DONE || s == EnergyEndpointer.State.NO_SPEECH) break
+                if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    // Some phones need a moment, or refuse (mic busy / blocked in background). Retry once.
+                    kotlinx.coroutines.delay(200)
+                    rec.stop()
+                    rec.startRecording()
                 }
+                if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    micProblem = "recorder did not start (state ${rec.recordingState})"
+                } else {
+                    val buf = ShortArray(frameSize)
+                    var zeroReads = 0
+                    while (isActive) {
+                        val n = rec.read(buf, 0, buf.size)
+                        if (n < 0) { micProblem = "mic read error $n (state ${rec.recordingState})"; break }
+                        if (n == 0) { if (++zeroReads > 40) { micProblem = "mic returned no audio"; break }; continue }
+                        zeroReads = 0
+                        val chunk = buf.copyOf(n)
+                        pcm += chunk
+                        val s = ep.feed(chunk, n)
+                        if (s == EnergyEndpointer.State.DONE || s == EnergyEndpointer.State.NO_SPEECH) break
+                    }
+                }
+            } catch (e: Exception) {
+                micProblem = "mic start failed: ${e.javaClass.simpleName}"
             } finally {
                 runCatching { rec.stop() }
                 rec.release()
             }
+            if (micProblem != null) {
+                Log.w(TAG, micProblem)
+                WhisperStore(context).lastProblem = micProblem
+                withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
+                return@launch
+            }
             if (!isActive) return@launch
             if (ep.state != EnergyEndpointer.State.DONE) {
-                withContext(Dispatchers.Main) { onError() }
+                withContext(Dispatchers.Main) { onError(SttFailure.NO_SPEECH) }
                 return@launch
             }
             val total = pcm.sumOf { it.size }
             val all = ShortArray(total)
             var o = 0
             for (c in pcm) { c.copyInto(all, o); o += c.size }
+            var failure = SttFailure.TRANSCRIBE_FAILED
+            var ranOk = false
             val text = try {
                 val h = ensureLoaded()
                 val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-                WhisperNative.nativeTranscribe(h, EnergyEndpointer.toFloat(all), language, threads).trim()
+                WhisperNative.nativeTranscribe(h, EnergyEndpointer.toFloat(all), language, threads).trim().also { ranOk = true }
             } catch (e: Throwable) {
                 Log.w(TAG, "transcribe failed: ${e.javaClass.simpleName}")
+                WhisperStore(context).lastProblem = "transcribe failed: ${e.javaClass.simpleName} ${e.message?.take(80).orEmpty()}"
+                failure = SttFailure.TRANSCRIBE_FAILED
                 ""
             }
-            withContext(Dispatchers.Main) { if (text.isNotEmpty()) onResult(text) else onError() }
+            withContext(Dispatchers.Main) {
+                if (text.isNotEmpty()) onResult(text)
+                else onError(if (failure == SttFailure.TRANSCRIBE_FAILED && ranOk) SttFailure.EMPTY_TRANSCRIPT else failure)
+            }
         }
     }
 

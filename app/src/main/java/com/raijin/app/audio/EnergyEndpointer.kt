@@ -18,6 +18,7 @@ class EnergyEndpointer(
     enum class State { WAITING, SPEAKING, DONE, NO_SPEECH }
 
     private var frames = 0
+    private var floorSum = 0.0
     private var floor = 0.0
     private var spoke = false
     private var quietMs = 0
@@ -30,7 +31,10 @@ class EnergyEndpointer(
         val rms = rms(frame, len)
         val elapsed = frames * frameMs
         if (frames <= noiseFrames) {
-            floor = maxOf(floor, rms)
+            // Average (not max) so the tap/beep at the start does not raise the bar,
+            // and cap it so a noisy room cannot hide normal speech.
+            floorSum += rms
+            floor = minOf(floorSum / frames, MAX_FLOOR)
             return state
         }
         val threshold = maxOf(floor * 3.0, minRms)
@@ -48,6 +52,8 @@ class EnergyEndpointer(
     }
 
     companion object {
+        private const val MAX_FLOOR = 450.0
+
         fun rms(frame: ShortArray, len: Int = frame.size): Double {
             if (len == 0) return 0.0
             var sum = 0.0

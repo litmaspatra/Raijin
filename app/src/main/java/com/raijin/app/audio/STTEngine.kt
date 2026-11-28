@@ -48,13 +48,22 @@ class STTEngine(
     ) {
         scope.launch(Dispatchers.Main) {
             stopInternal()
-            if (WhisperStore(context).enabled && WhisperEngine.isAvailable(context)) {
-                startWhisper(onResult, onError, onAlternatives)
+            if (WhisperStore(context).enabled && !WhisperNative.available) {
+                WhisperStore(context).lastProblem = "engine library not in this build"
+                createAndStart(onResult, onPartial, onError, onAlternatives)
+            } else if (WhisperStore(context).enabled && !WhisperEngine.modelBundled(context)) {
+                WhisperStore(context).lastProblem = "speech model not in this build"
+                createAndStart(onResult, onPartial, onError, onAlternatives)
+            } else if (WhisperStore(context).enabled) {
+                startWhisper(onResult, onPartial, onError, onAlternatives)
             } else {
                 createAndStart(onResult, onPartial, onError, onAlternatives)
             }
         }
     }
+
+    /** True when the next listen uses on-device Whisper (it needs more time than the system recognizer). */
+    fun usesWhisper(): Boolean = WhisperStore(context).enabled && WhisperEngine.isAvailable(context)
 
     /** Immediately cancel any ongoing recognition session. */
     fun stop() {
@@ -72,6 +81,7 @@ class STTEngine(
     /** VO-2: on-device Whisper path. No partials; the result arrives after the speaker stops. */
     private fun startWhisper(
         onResult: (String) -> Unit,
+        onPartial: (String) -> Unit,
         onError: (Int) -> Unit,
         onAlternatives: ((List<String>) -> Unit)?,
     ) {
@@ -83,7 +93,20 @@ class STTEngine(
         whisper.startListening(
             language = lang,
             onResult = { text -> if (onAlternatives != null) onAlternatives(listOf(text)) else onResult(text) },
-            onError = { onError(SpeechRecognizer.ERROR_NO_MATCH) },
+            onError = { code ->
+                val engineFailure = code == SttFailure.MIC_UNAVAILABLE || code == SttFailure.TRANSCRIBE_FAILED
+                if (engineFailure) {
+                    // On-device speech broke (not just silence): say why in the log and settings,
+                    // then hand the same listen to the system recognizer instead of stopping.
+                    Log.w(TAG, "Whisper failed (${WhisperStore(context).lastProblem}); falling back to system recognizer")
+                    scope.launch(Dispatchers.Main) {
+                        stopInternal()
+                        createAndStart(onResult, onPartial, onError, onAlternatives)
+                    }
+                } else {
+                    onError(code)
+                }
+            },
         )
     }
 
@@ -95,7 +118,7 @@ class STTEngine(
     ) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             Log.w(TAG, "Speech recognition not available on this device")
-            onError(SpeechRecognizer.ERROR_CLIENT)
+            onError(SttFailure.NO_RECOGNIZER)
             return
         }
 

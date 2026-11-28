@@ -9,4 +9,9 @@ class WhisperStore(context: Context) {
     var enabled: Boolean
         get() = prefs.getBoolean("enabled", false)
         set(v) = prefs.edit().putBoolean("enabled", v).apply()
+
+    /** Short technical reason of the last on-device speech failure, kept on the phone for the settings card. */
+    var lastProblem: String?
+        get() = prefs.getString("last_problem", null)
+        set(v) = prefs.edit().putString("last_problem", v).apply()
 }

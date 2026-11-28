@@ -30,6 +30,7 @@ fun OnDeviceSpeechCard(
     enabled: Boolean,
     available: Boolean,
     onEnabled: (Boolean) -> Unit,
+    lastProblem: String? = null,
 ) {
     Surface(shape = RoundedCornerShape(12.dp), color = RaijinSurface, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -56,6 +57,9 @@ fun OnDeviceSpeechCard(
                     onCheckedChange = onEnabled,
                     colors = SwitchDefaults.colors(checkedTrackColor = RaijinBlue, uncheckedTrackColor = RaijinTextDim),
                 )
+            }
+            if (enabled && lastProblem != null) {
+                Text("Last on-device speech problem: $lastProblem. Raijin used the system recognizer instead.", color = RaijinText, fontSize = 10.sp)
             }
             if (enabled && !available) {
                 Text("This build has no bundled speech model, so the system recognizer is used.", color = RaijinText, fontSize = 10.sp)
