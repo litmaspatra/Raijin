@@ -14,4 +14,9 @@ class WhisperStore(context: Context) {
     var lastProblem: String?
         get() = prefs.getString("last_problem", null)
         set(v) = prefs.edit().putString("last_problem", v).apply()
+
+    /** What the microphone did during the last on-device listen (state, reads, silenced, app importance, mic service). */
+    var lastListen: String?
+        get() = prefs.getString("last_listen", null)
+        set(v) = prefs.edit().putString("last_listen", v).apply()
 }

@@ -58,4 +58,16 @@ class EnergyEndpointerFloorTest {
         repeat(15) { ep.feed(frame(2500)) } // normal speech
         assertEquals(EnergyEndpointer.State.SPEAKING, ep.state)
     }
+
+    @Test fun diagnosticsReportPeakFloorAndThreshold() {
+        val ep = EnergyEndpointer()
+        val quiet = ShortArray(480) { 100 }
+        val loud = ShortArray(480) { 3000 }
+        repeat(8) { ep.feed(quiet) }
+        ep.feed(loud)
+        assertEquals(9 * 30, ep.heardMs)
+        assertEquals(3000.0, ep.peakRms, 1.0)
+        assertEquals(100.0, ep.noiseFloor, 1.0)
+        assertEquals(350.0, ep.speechThreshold, 1.0)
+    }
 }

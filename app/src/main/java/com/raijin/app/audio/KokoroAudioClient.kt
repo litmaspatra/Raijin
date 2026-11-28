@@ -200,6 +200,11 @@ class KokoroConfigStore(context: Context) {
         enabled = prefs.getBoolean("local_enabled", false),
     )
 
+    /** Why the last spoken line used the system voice (null when the on-device voice spoke it). */
+    var lastFallback: String?
+        get() = prefs.getString("last_fallback", null)
+        set(v) { if (v == null) prefs.edit().remove("last_fallback").apply() else prefs.edit().putString("last_fallback", v).apply() }
+
     fun save(config: KokoroVoiceConfig) {
         prefs.edit()
             .putString("voice", KokoroVoices.byId(config.voice).id)

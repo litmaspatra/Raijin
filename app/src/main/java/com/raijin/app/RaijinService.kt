@@ -1017,6 +1017,7 @@ class RaijinService : Service() {
             fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         }
         startForeground(NOTIF_ID, buildNotification("Raijin Tactical HUD // Ready"), fgsType)
+        com.raijin.app.audio.MicState.serviceHasMicType = (fgsType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) != 0
     }
 
     /**
