@@ -60,6 +60,14 @@ class UserPreferencesStore(context: Context) {
             else prefs.edit().putString(KEY_ADDRESS_TERM, value.trim()).apply()
         }
 
+    /**
+     * Owner-approved (28 Nov): add remembered facts, the form of address and tool/skill names
+     * and descriptions to the cloud AI's prompt. On by default; the owner can switch it off.
+     */
+    var shareContextWithCloud: Boolean
+        get() = prefs.getBoolean(KEY_SHARE_CLOUD_CONTEXT, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHARE_CLOUD_CONTEXT, value).apply()
+
     /** Name of the chosen system TTS voice; null means "pick the best installed one". */
     var systemVoice: String?
         get() = prefs.getString(KEY_SYSTEM_VOICE, null)
@@ -150,6 +158,7 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_PROVIDERS = "preferred_providers"
 
         const val KEY_ADDRESS_TERM = "address_term"
+        const val KEY_SHARE_CLOUD_CONTEXT = "share_cloud_context"
         const val DEFAULT_VOICE = "bf_emma"
         val DEFAULT_PROTECTED_PATHS = setOf(
             "/storage/emulated/0/DCIM",

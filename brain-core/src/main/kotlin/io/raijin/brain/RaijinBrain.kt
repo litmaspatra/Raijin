@@ -45,6 +45,8 @@ class RaijinBrain(
     private val callCountdownMillis: Long = 2_000L,
     /** BR-7: speaks one finished sentence of a streaming answer (null = no streaming speech). */
     private val speakSentence: ((String) -> Unit)? = null,
+    /** Owner-approved cloud context (see [CloudContext]); empty when the owner switched sharing off. */
+    private val cloudContext: (suspend () -> String)? = null,
 ) : RaijinBrainBridge {
     private val _islandState = MutableStateFlow<IslandVisualState>(IslandVisualState.Idle)
     override val islandState: StateFlow<IslandVisualState> = _islandState.asStateFlow()
@@ -529,7 +531,8 @@ class RaijinBrain(
                             val speak = speakSentence
                             val full = cloudReasoning.completeStreaming(
                                 prompt = SessionContextPrompt.build(rawText, sessionTurns),
-                                systemPrompt = Persona.systemPrompt,
+                                systemPrompt = Persona.systemPrompt +
+                                    (runCatching { cloudContext?.invoke() }.getOrNull().orEmpty()),
                             ) { delta ->
                                 if (speak != null) {
                                     for (sentence in chunker.feed(delta)) {

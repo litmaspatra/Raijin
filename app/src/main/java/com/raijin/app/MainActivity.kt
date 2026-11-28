@@ -1426,6 +1426,12 @@ private fun MasterSettingsAndCommandDeck(
                                 onClear = { vaultStore.clear(); vaultLabel = null },
                             )
                             Spacer(Modifier.height(16.dp))
+                            var shareCloud by remember { mutableStateOf(voiceStore.shareContextWithCloud) }
+                            com.raijin.app.ui.prefs.CloudContextCard(
+                                enabled = shareCloud,
+                                onEnabled = { shareCloud = it; voiceStore.shareContextWithCloud = it },
+                            )
+                            Spacer(Modifier.height(16.dp))
                             val whisperStore = remember { com.raijin.app.audio.WhisperStore(context) }
                             var whisperOn by remember { mutableStateOf(whisperStore.enabled) }
                             com.raijin.app.ui.prefs.OnDeviceSpeechCard(
