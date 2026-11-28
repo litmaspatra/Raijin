@@ -107,4 +107,16 @@ class UserPreferencesStoreTest {
         store.useContactHistory = false
         assertEquals(false, store.useContactHistory)
     }
+
+    @Test
+    fun `address term persists and rewrites spoken boss`() {
+        assertNull(store.addressTerm)
+        store.addressTerm = "sir"
+        assertEquals("sir", UserPreferencesStore(
+            androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>(),
+        ).addressTerm)
+        assertEquals("Done, sir.", io.raijin.brain.AddressForm.rewrite("Done, boss.", store.addressTerm))
+        store.addressTerm = null
+        assertNull(store.addressTerm)
+    }
 }
