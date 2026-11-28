@@ -49,11 +49,13 @@ class STTEngine(
         scope.launch(Dispatchers.Main) {
             stopInternal()
             if (WhisperStore(context).enabled && !WhisperNative.available) {
-                onError(SttFailure.WHISPER_NO_NATIVE)
+                WhisperStore(context).lastProblem = "engine library not in this build"
+                createAndStart(onResult, onPartial, onError, onAlternatives)
             } else if (WhisperStore(context).enabled && !WhisperEngine.modelBundled(context)) {
-                onError(SttFailure.WHISPER_NO_MODEL)
+                WhisperStore(context).lastProblem = "speech model not in this build"
+                createAndStart(onResult, onPartial, onError, onAlternatives)
             } else if (WhisperStore(context).enabled) {
-                startWhisper(onResult, onError, onAlternatives)
+                startWhisper(onResult, onPartial, onError, onAlternatives)
             } else {
                 createAndStart(onResult, onPartial, onError, onAlternatives)
             }
@@ -79,6 +81,7 @@ class STTEngine(
     /** VO-2: on-device Whisper path. No partials; the result arrives after the speaker stops. */
     private fun startWhisper(
         onResult: (String) -> Unit,
+        onPartial: (String) -> Unit,
         onError: (Int) -> Unit,
         onAlternatives: ((List<String>) -> Unit)?,
     ) {
@@ -90,7 +93,20 @@ class STTEngine(
         whisper.startListening(
             language = lang,
             onResult = { text -> if (onAlternatives != null) onAlternatives(listOf(text)) else onResult(text) },
-            onError = { code -> onError(code) },
+            onError = { code ->
+                val engineFailure = code == SttFailure.MIC_UNAVAILABLE || code == SttFailure.TRANSCRIBE_FAILED
+                if (engineFailure) {
+                    // On-device speech broke (not just silence): say why in the log and settings,
+                    // then hand the same listen to the system recognizer instead of stopping.
+                    Log.w(TAG, "Whisper failed (${WhisperStore(context).lastProblem}); falling back to system recognizer")
+                    scope.launch(Dispatchers.Main) {
+                        stopInternal()
+                        createAndStart(onResult, onPartial, onError, onAlternatives)
+                    }
+                } else {
+                    onError(code)
+                }
+            },
         )
     }
 
