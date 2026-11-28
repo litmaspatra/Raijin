@@ -8,19 +8,19 @@ package io.raijin.brain
 object VaultQueryParser {
     private val QUERIES = listOf(
         Regex(
-            """^(?:please\\s+)?(?:what(?:'s|\\s+is|\\s+are)?|tell\\s+me\\s+what(?:'s|\\s+is)?|show\\s+me\\s+what(?:'s|\\s+is)?)\\s+(?:inside|in|within)\\s+(?:my\\s+|the\\s+)?(?:obsidian|vault|notes?)(?:\\s+(?:folder|vault|notes?))?[?.!]?$""",
+            """^(?:please\s+)?(?:what(?:'s|s|\s+is|\s+are)?|tell\s+me\s+what(?:'s|\s+is)?|show\s+me\s+what(?:'s|\s+is)?)\s+(?:inside|in|within)\s+(?:my\s+|the\s+)?(?:obsidian|vault|notes?)(?:\s+(?:folder|vault|notes?))?[?.!]?$""",
             RegexOption.IGNORE_CASE,
         ),
         Regex(
-            """^(?:please\\s+)?(?:list|show|read|open|check)(?:\\s+me)?\\s+(?:all\\s+)?(?:of\\s+)?(?:my\\s+|the\\s+)?(?:obsidian|vault|notes?)(?:\\s+(?:folder|vault|notes?|contents?|folders?))?(?:\\s+please)?[?.!]?$""",
+            """^(?:please\s+)?(?:list|show|read|open|check)(?:\s+me)?\s+(?:all\s+)?(?:of\s+)?(?:my\s+|the\s+)?(?:obsidian|vault|notes?)(?:\s+(?:folder|vault|notes?|contents?|folders?))?(?:\s+please)?[?.!]?$""",
             RegexOption.IGNORE_CASE,
         ),
         Regex(
-            """^(?:what|which)\\s+notes\\s+(?:do\\s+i\\s+have|are\\s+there)(?:\\s+in\\s+(?:my\\s+)?(?:obsidian|vault)(?:\\s+(?:folder|vault))?)?[?.!]?$""",
+            """^(?:what|which)\s+notes\s+(?:do\s+i\s+have|are\s+there)(?:\s+in\s+(?:my\s+)?(?:obsidian|vault)(?:\s+(?:folder|vault))?)?[?.!]?$""",
             RegexOption.IGNORE_CASE,
         ),
         Regex(
-            """^(?:what(?:'s|\\s+is)\\s+)?(?:inside|in)\\s+(?:my\\s+)?obsidian(?:\\s+(?:folder|vault))?[?.!]?$""",
+            """^(?:what(?:'s|s|\s+is)\s+)?(?:inside|in)\s+(?:my\s+)?obsidian(?:\s+(?:folder|vault))?[?.!]?$""",
             RegexOption.IGNORE_CASE,
         ),
     )

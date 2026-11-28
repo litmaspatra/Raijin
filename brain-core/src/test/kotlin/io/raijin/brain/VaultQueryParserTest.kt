@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class VaultQueryParserTest {
     @Test fun routesFolderQuestions() {
         listOf(
-            "what is inside my obsidian folder", "What's in my Obsidian vault?", "what is in my obsidian",
+            "what is inside my obsidian folder", "What's in my Obsidian vault?", "what is in my obsidian", "what is inside my obsidian", "What is inside my Obsidian?", "whats inside my obsidian folder", "what is inside the obsidian vault",
             "list my notes", "show my obsidian vault", "what notes do I have", "what is inside my vault",
         ).forEach { assertTrue(VaultQueryParser.matches(it), it) }
     }
