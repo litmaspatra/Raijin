@@ -52,18 +52,34 @@ class SkillFetcherTest {
         assertTrue(fetcherReturning(big).load(source) is SkillFetcher.Outcome.Error)
     }
 
+    private val sha = "0123456789abcdef0123456789abcdef01234567"
+
     @Test
-    fun `github source fetches the raw url`() = runTest {
+    fun `github source is pinned to an exact commit before fetching`() = runTest {
         var requested: String? = null
-        val fetcher = SkillFetcher(fetch = { url -> requested = url; "{}" })
-        val source = SkillSourceResolver.resolve("litmaspatra/raijin-skills")
-        val outcome = fetcher.load(source)
-        assertTrue(outcome is SkillFetcher.Outcome.Ok)
-        assertEquals(
-            "https://raw.githubusercontent.com/litmaspatra/raijin-skills/HEAD/skill.json",
-            requested,
+        val fetcher = SkillFetcher(
+            fetch = { url -> requested = url; "{}" },
+            resolveCommit = { _, _, ref -> if (ref == "HEAD") sha else null },
         )
-        assertEquals("github:litmaspatra/raijin-skills", (outcome as SkillFetcher.Outcome.Ok).sourceLabel)
+        val outcome = fetcher.load(SkillSourceResolver.resolve("litmaspatra/raijin-skills"))
+        assertTrue(outcome is SkillFetcher.Outcome.Ok)
+        assertEquals("https://raw.githubusercontent.com/litmaspatra/raijin-skills/$sha/skill.json", requested)
+        assertEquals("github:litmaspatra/raijin-skills@$sha", (outcome as SkillFetcher.Outcome.Ok).sourceLabel)
+    }
+
+    @Test
+    fun `github source with a commit given is used as is`() = runTest {
+        var requested: String? = null
+        val fetcher = SkillFetcher(fetch = { url -> requested = url; "{}" }, resolveCommit = { _, _, _ -> null })
+        val outcome = fetcher.load(SkillSourceResolver.resolve("a/b@$sha"))
+        assertTrue(outcome is SkillFetcher.Outcome.Ok)
+        assertEquals("https://raw.githubusercontent.com/a/b/$sha/skill.json", requested)
+    }
+
+    @Test
+    fun `github source that cannot be pinned is refused`() = runTest {
+        val fetcher = SkillFetcher(fetch = { "{}" }, resolveCommit = { _, _, _ -> null })
+        assertTrue(fetcher.load(SkillSourceResolver.resolve("a/b")) is SkillFetcher.Outcome.Error)
     }
 
     @Test
