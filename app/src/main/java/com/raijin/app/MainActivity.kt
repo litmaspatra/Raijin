@@ -38,7 +38,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.raijin.app.audio.KokoroAudioClient
 import com.raijin.app.audio.KokoroConfigStore
-import com.raijin.app.audio.KokoroVoiceConfig
+import com.raijin.app.audio.KokoroAssets
 import com.raijin.app.cloud.OpenAiCompatibleClient
 import com.raijin.app.cloud.OpenAiConfig
 import com.raijin.app.cloud.OpenAiConfigStore
@@ -226,15 +226,13 @@ private fun MasterSettingsAndCommandDeck(
 
     var commandText by remember { mutableStateOf("") }
 
-    // Kokoro Neural TTS State
+    // On-device Kokoro voice state
     val kokoroStore = remember { KokoroConfigStore(context) }
     var kokoroConfig by remember { mutableStateOf(kokoroStore.load()) }
-    var kokoroEndpoint by remember { mutableStateOf(kokoroConfig.endpointUrl) }
-    var kokoroApiKey by remember { mutableStateOf(kokoroConfig.apiKey) }
-    var kokoroVoice by remember { mutableStateOf(kokoroConfig.voice) }
-    var kokoroEnabled by remember { mutableStateOf(kokoroConfig.enabled) }
     var kokoroTestStatus by remember { mutableStateOf<String?>(null) }
     var isTestingKokoro by remember { mutableStateOf(false) }
+    val kokoroTester = remember { KokoroAudioClient(context) { kokoroStore.load().copy(enabled = true) } }
+    val kokoroAvailable = remember { KokoroAssets.engineAvailable() && KokoroAssets.bundled(context) }
 
     // Cloud Brain Model Catalog State
     var isFetchingModels by remember { mutableStateOf(false) }
@@ -993,177 +991,25 @@ private fun MasterSettingsAndCommandDeck(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Kokoro Neural Voice Synthesis & Persona Configuration
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = RaijinSurface,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            "KOKORO NEURAL VOICE SYNTHESIS",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = RaijinBlueLight,
-                                        )
-                                        Text("Sci-fi HUD voice personas (Karen & Friday)", fontSize = 10.sp, color = RaijinTextDim)
-                                    }
-                                    Switch(
-                                        checked = kokoroEnabled,
-                                        onCheckedChange = {
-                                            kokoroEnabled = it
-                                            val updated = KokoroVoiceConfig(
-                                                endpointUrl = kokoroEndpoint,
-                                                apiKey = kokoroApiKey,
-                                                voice = kokoroVoice,
-                                                speed = 1.0f,
-                                                enabled = it,
-                                            )
-                                            kokoroStore.save(updated)
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = RaijinBlue,
-                                            checkedTrackColor = RaijinBlueDim,
-                                        ),
-                                    )
+                        // On-device English voice (Kokoro)
+                        com.raijin.app.ui.prefs.KokoroVoiceCard(
+                            available = kokoroAvailable,
+                            enabled = kokoroConfig.enabled,
+                            onEnabled = { kokoroConfig = kokoroConfig.copy(enabled = it).also(kokoroStore::save) },
+                            voiceId = kokoroConfig.voice,
+                            onVoice = { kokoroConfig = kokoroConfig.copy(voice = it).also(kokoroStore::save) },
+                            testing = isTestingKokoro,
+                            onTest = {
+                                isTestingKokoro = true
+                                kokoroTestStatus = "Speaking..."
+                                kokoroTester.speak("Hello. This is my on-device voice.") { ok ->
+                                    isTestingKokoro = false
+                                    kokoroTestStatus = if (ok) "Played on this phone." else "Could not play; the system voice will be used."
                                 }
-
-                                if (kokoroEnabled) {
-                                    Text("Select Persona Voice:", fontSize = 11.sp, color = RaijinText)
-
-                                    // Voice Selection Chips
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        KokoroVoiceConfig.AVAILABLE_VOICES.chunked(2).forEach { rowVoices ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            ) {
-                                                rowVoices.forEach { opt ->
-                                                    Surface(
-                                                        onClick = {
-                                                            kokoroVoice = opt.id
-                                                            val updated = KokoroVoiceConfig(
-                                                                endpointUrl = kokoroEndpoint,
-                                                                apiKey = kokoroApiKey,
-                                                                voice = opt.id,
-                                                                speed = 1.0f,
-                                                                enabled = kokoroEnabled,
-                                                            )
-                                                            kokoroStore.save(updated)
-                                                        },
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        color = if (kokoroVoice == opt.id) RaijinBlue else RaijinBlack,
-                                                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                                                            brush = androidx.compose.ui.graphics.SolidColor(if (kokoroVoice == opt.id) RaijinBlue else RaijinBorderDim)
-                                                        ),
-                                                        modifier = Modifier.weight(1f),
-                                                    ) {
-                                                        Box(
-                                                            contentAlignment = Alignment.Center,
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                                                        ) {
-                                                            Text(
-                                                                text = opt.label,
-                                                                fontSize = 9.sp,
-                                                                fontFamily = FontFamily.Monospace,
-                                                                color = if (kokoroVoice == opt.id) RaijinBlack else RaijinWhite,
-                                                                maxLines = 1,
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    OutlinedTextField(
-                                        value = kokoroEndpoint,
-                                        onValueChange = { kokoroEndpoint = it },
-                                        label = { Text("Kokoro Endpoint URL (/v1/audio/speech)") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-
-                                    OutlinedTextField(
-                                        value = kokoroApiKey,
-                                        onValueChange = { kokoroApiKey = it },
-                                        label = { Text("TTS API Key (DeepInfra / OpenAI / optional)") },
-                                        visualTransformation = PasswordVisualTransformation(),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Button(
-                                            onClick = {
-                                                val updated = KokoroVoiceConfig(
-                                                    endpointUrl = kokoroEndpoint,
-                                                    apiKey = kokoroApiKey,
-                                                    voice = kokoroVoice,
-                                                    speed = 1.0f,
-                                                    enabled = kokoroEnabled,
-                                                )
-                                                kokoroStore.save(updated)
-                                                kokoroTestStatus = "Kokoro voice settings saved."
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = RaijinBlue, contentColor = RaijinBlack),
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text("Save Voice", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                isTestingKokoro = true
-                                                kokoroTestStatus = "Synthesizing voice sample..."
-                                                val client = KokoroAudioClient(context) {
-                                                    KokoroVoiceConfig(
-                                                        endpointUrl = kokoroEndpoint,
-                                                        apiKey = kokoroApiKey,
-                                                        voice = kokoroVoice,
-                                                        speed = 1.0f,
-                                                        enabled = true,
-                                                    )
-                                                }
-                                                val testPhrase = if (kokoroVoice == "bm_george") {
-                                                    "At your service, sir. All systems are operational."
-                                                } else if (kokoroVoice == "bf_emma") {
-                                                    "Friday online. Atmospheric pressure and tactical telemetry verified."
-                                                } else {
-                                                    "Karen online. Neural audio channel connected and ready."
-                                                }
-                                                client.speak(testPhrase) { success ->
-                                                    coroutineScope.launch(Dispatchers.Main) {
-                                                        isTestingKokoro = false
-                                                        kokoroTestStatus = if (success) "✓ Kokoro neural audio playback verified!" else "✗ Voice synthesis failed. Falling back to native TTS."
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(if (isTestingKokoro) "Voicing…" else "🔊 Test Voice", fontSize = 11.sp, color = RaijinBlueLight)
-                                        }
-                                    }
-
-                                    kokoroTestStatus?.let {
-                                        Text(
-                                            text = it,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            color = if (it.startsWith("✓")) RaijinGreen else if (it.startsWith("✗")) RaijinRed else RaijinGold,
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                            },
+                            status = kokoroTestStatus,
+                            lastProblem = kokoroTester.lastProblem,
+                        )
 
                         Spacer(Modifier.height(16.dp))
 
