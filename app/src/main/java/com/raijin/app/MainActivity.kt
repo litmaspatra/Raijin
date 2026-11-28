@@ -1411,19 +1411,19 @@ private fun MasterSettingsAndCommandDeck(
                                 androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
                             ) { granted -> historyGranted = granted }
                             val vaultStore = remember { com.raijin.app.obsidian.ObsidianVaultStore(context) }
-                            var vaultPath by remember { mutableStateOf(vaultStore.vaultRoot ?: "") }
-                            var vaultStatus by remember {
-                                mutableStateOf(vaultStore.vaultRoot?.let { "Vault set: $it" } ?: "Not set yet. Nothing is written until you save a folder.")
+                            var vaultLabel by remember { mutableStateOf(vaultStore.takeIf { it.openFs() != null }?.label()) }
+                            val vaultPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                                androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+                            ) { uri ->
+                                if (uri != null) {
+                                    runCatching { vaultStore.select(uri) }
+                                    vaultLabel = vaultStore.takeIf { it.openFs() != null }?.label()
+                                }
                             }
                             com.raijin.app.ui.prefs.ObsidianVaultCard(
-                                path = vaultPath,
-                                status = vaultStatus,
-                                onPathChange = { vaultPath = it },
-                                onSave = {
-                                    val r = com.raijin.app.obsidian.VaultRootCheck.check(vaultPath)
-                                    if (r is com.raijin.app.obsidian.VaultRootCheck.Result.Ok) vaultStore.vaultRoot = r.path
-                                    vaultStatus = com.raijin.app.obsidian.VaultRootCheck.message(r)
-                                },
+                                folderLabel = vaultLabel,
+                                onChoose = { vaultPicker.launch(null) },
+                                onClear = { vaultStore.clear(); vaultLabel = null },
                             )
                             Spacer(Modifier.height(16.dp))
                             com.raijin.app.ui.prefs.ContactHistoryCard(

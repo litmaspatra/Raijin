@@ -939,23 +939,16 @@ class AndroidActuator(
     private suspend fun executeWriteVaultNote(action: DispatchResult): ActionResult {
         val args = action.args as? ActionArgs.VaultNote
             ?: return ActionResult.FAILED("Missing vault note arguments")
-        val rootPath = com.raijin.app.obsidian.ObsidianVaultStore(context).vaultRoot
-            ?: return ActionResult.FAILED("Obsidian vault root is not configured")
-        val root = java.io.File(rootPath)
-        if (!root.isDirectory) return ActionResult.FAILED("Configured vault root is not a directory: $rootPath")
-        val target = java.io.File(root, args.relativePath)
-        val rootCanonical = root.canonicalPath
-        val targetCanonical = target.canonicalPath
-        if (targetCanonical != rootCanonical && !targetCanonical.startsWith(rootCanonical + java.io.File.separator)) {
+        val fs = com.raijin.app.obsidian.ObsidianVaultStore(context).openFs()
+            ?: return ActionResult.FAILED("Obsidian vault folder is not selected (or access was removed)")
+        if (!com.raijin.app.obsidian.VaultFs.safeRel(args.relativePath)) {
             return ActionResult.DENIED("Note path escapes the vault root")
         }
-        if (target.exists() && !args.append) {
+        if (fs.exists(args.relativePath) && !args.append) {
             return ActionResult.DENIED("Note already exists (create-only): ${args.relativePath}")
         }
         return try {
-            target.parentFile?.mkdirs()
-            if (args.append) target.appendText(args.content, Charsets.UTF_8)
-            else target.writeText(args.content, Charsets.UTF_8)
+            fs.write(args.relativePath, args.content, args.append)
             ActionResult.EXECUTED("Note ${if (args.append) "appended to" else "written"}: ${args.relativePath}")
         } catch (e: Exception) {
             ActionResult.FAILED("Vault write failed: ${e.javaClass.simpleName}")

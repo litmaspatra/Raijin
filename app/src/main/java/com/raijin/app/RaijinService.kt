@@ -991,37 +991,20 @@ class RaijinService : Service() {
             return
         }
 
-        // 1. Vault root: owner-set only. Unset -> ask, verify the directory
-        //    actually exists before storing it. A spoken path that does not
-        //    resolve to a real directory is refused, never guessed around.
+        // 1. Vault folder: picked by the owner in Settings (Android folder picker),
+        //    never typed, spoken or guessed. Unset or access removed -> say so and stop.
         val vaultStore = com.raijin.app.obsidian.ObsidianVaultStore(this)
-        if (vaultStore.vaultRoot == null) {
-            val answer = try {
-                askOwnerForSkill(
-                    "Which folder is your Obsidian vault? Say the full path, for example /sdcard/Documents/MyVault.",
-                    traceId,
-                    "Use folder",
-                )
-            } catch (e: com.raijin.app.skill.SkillAskBridge.AskCancelledException) { null }
-            if (answer == null) {
-                _islandState.value = IslandState.Done("No vault set")
-                tts.speak("Okay, no notes until you set a vault folder.")
-                return
-            }
-            val candidate = java.io.File(answer.trim())
-            if (!candidate.isDirectory) {
-                val msg = "That folder does not exist on this phone. Nothing was saved."
-                _islandState.value = IslandState.Failed(msg)
-                tts.speak(msg)
-                return
-            }
-            vaultStore.vaultRoot = candidate.absolutePath
+        val vaultFs = vaultStore.openFs()
+        if (vaultFs == null) {
+            val msg = "Pick your vault folder in Raijin settings first. Nothing was written."
+            _islandState.value = IslandState.Failed(msg)
+            tts.speak(msg)
+            return
         }
-        val rootPath = vaultStore.vaultRoot!!
 
         // 2. Read-only scan of the real vault structure.
         val index = try {
-            com.raijin.app.obsidian.VaultIndex.scan(rootPath)
+            com.raijin.app.obsidian.VaultIndex.scan(vaultFs)
         } catch (e: Exception) {
             val msg = "I could not read the vault folder: ${e.javaClass.simpleName}."
             _islandState.value = IslandState.Failed(msg)

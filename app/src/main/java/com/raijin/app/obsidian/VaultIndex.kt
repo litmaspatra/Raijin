@@ -24,9 +24,13 @@ class VaultIndex(
         fun scan(rootPath: String): VaultIndex {
             val root = File(rootPath)
             require(root.isDirectory) { "vault root is not a directory: $rootPath" }
+            return scan(FileVaultFs(root))
+        }
+
+        fun scan(fs: VaultFs): VaultIndex {
             val folders = mutableListOf<String>()
             val notes = mutableMapOf<String, String>()
-            var frontmatterKeys = mutableMapOf<String, Int>()
+            val frontmatterKeys = mutableMapOf<String, Int>()
             var wikilinkNotes = 0
             var tagNotes = 0
             var dailyNamed = 0
@@ -35,42 +39,33 @@ class VaultIndex(
             val fmKeyRe = Regex("""^([A-Za-z][\w-]*):\s*.*$""")
             val wikiRe = Regex("""\[\[[^\]]+]]""")
 
-            // Scanning and aggregation stay within the selected vault root:
-            // symlinked dirs or files that resolve outside it are skipped.
-            val rootCanonical = root.canonicalPath
-            fun insideVault(f: File): Boolean {
-                val c = runCatching { f.canonicalPath }.getOrNull() ?: return false
-                return c == rootCanonical || c.startsWith(rootCanonical + File.separator)
-            }
-
-            root.walkTopDown()
-                .onEnter { dir -> !dir.name.startsWith(".") && insideVault(dir) }
-                .forEach { f ->
-                    if (!insideVault(f)) return@forEach
-                    val rel = f.relativeTo(root).path.replace(File.separatorChar, '/')
-                    when {
-                        f.isDirectory -> if (rel.isNotEmpty()) folders += rel // root itself relativizes to "", never a folder entry
-                        f.extension == "md" -> {
-                            mdCount++
-                            notes[f.nameWithoutExtension] = rel
-                            if (dailyRe.containsMatchIn(f.nameWithoutExtension)) dailyNamed++
-                            // Sample up to 25 notes for conventions; content stays
-                            // on-device — only aggregated conventions leave this class.
-                            if (mdCount <= 25) {
-                                val text = runCatching { f.readText(Charsets.UTF_8) }.getOrDefault("")
-                                if (text.startsWith("---")) {
-                                    text.lineSequence().drop(1).takeWhile { it.trim() != "---" }
-                                        .mapNotNull { fmKeyRe.matchEntire(it.trim())?.groupValues?.get(1) }
-                                        .forEach { frontmatterKeys.merge(it, 1, Int::plus) }
-                                }
-                                if (wikiRe.containsMatchIn(text)) wikilinkNotes++
-                                if (text.lineSequence().any { it.trimStart().startsWith("#") && !it.trimStart().startsWith("# ") }) {
-                                    tagNotes++
-                                }
+            for (e in fs.walk()) {
+                val rel = e.rel
+                val fileName = rel.substringAfterLast('/')
+                when {
+                    e.isDir -> folders += rel
+                    fileName.endsWith(".md") -> {
+                        val title = fileName.removeSuffix(".md")
+                        mdCount++
+                        notes[title] = rel
+                        if (dailyRe.containsMatchIn(title)) dailyNamed++
+                        // Sample up to 25 notes for conventions; content stays
+                        // on-device, only aggregated conventions leave this class.
+                        if (mdCount <= 25) {
+                            val text = fs.read(rel) ?: ""
+                            if (text.startsWith("---")) {
+                                text.lineSequence().drop(1).takeWhile { it.trim() != "---" }
+                                    .mapNotNull { fmKeyRe.matchEntire(it.trim())?.groupValues?.get(1) }
+                                    .forEach { frontmatterKeys.merge(it, 1, Int::plus) }
+                            }
+                            if (wikiRe.containsMatchIn(text)) wikilinkNotes++
+                            if (text.lineSequence().any { it.trimStart().startsWith("#") && !it.trimStart().startsWith("# ") }) {
+                                tagNotes++
                             }
                         }
                     }
                 }
+            }
 
             return VaultIndex(
                 folders = folders.sorted(),
