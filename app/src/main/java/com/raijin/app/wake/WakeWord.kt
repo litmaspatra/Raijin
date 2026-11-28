@@ -53,10 +53,7 @@ object WakeAssets {
     fun materialize(context: Context): File {
         val dir = File(context.filesDir, "kws").apply { mkdirs() }
         ALL.forEach { n ->
-            val out = File(dir, n)
-            if (!out.exists() || out.length() == 0L) {
-                context.assets.open("$ASSET_DIR/$n").use { i -> out.outputStream().use { o -> i.copyTo(o) } }
-            }
+            com.raijin.app.audio.AssetFiles.ensureCopied(context, "$ASSET_DIR/$n", File(dir, n))
         }
         return dir
     }

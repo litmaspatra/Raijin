@@ -154,13 +154,7 @@ class KokoroAudioClient(
         val dir = File(context.filesDir, "kokoro").apply { mkdirs() }
         for (name in KokoroAssets.ALL) {
             val path = "${KokoroAssets.ASSET_DIR}/$name"
-            val target = File(dir, name)
-            val expected = context.assets.openFd(path).use { it.length }
-            if (!target.exists() || target.length() != expected) {
-                val tmp = File(dir, "$name.part")
-                context.assets.open(path).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
-                check(tmp.renameTo(target)) { "copy failed: $name" }
-            }
+            AssetFiles.ensureCopied(context, path, File(dir, name))
         }
         val engine = Class.forName(KokoroAssets.ENGINE_CLASS).getConstructor(File::class.java).newInstance(dir) as KokoroSynth
         val words = File(dir, KokoroAssets.LEXICON).useLines { SpokenLexicon.parse(it) }

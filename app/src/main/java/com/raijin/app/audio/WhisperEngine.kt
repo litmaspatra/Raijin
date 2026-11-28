@@ -43,12 +43,7 @@ class WhisperEngine(
         if (handle != 0L) return handle
         val dir = File(context.filesDir, "whisper").apply { mkdirs() }
         val model = File(dir, File(MODEL_ASSET).name)
-        val expected = context.assets.openFd(MODEL_ASSET).use { it.length }
-        if (!model.exists() || model.length() != expected) {
-            val tmp = File(dir, model.name + ".part")
-            context.assets.open(MODEL_ASSET).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
-            check(tmp.renameTo(model)) { "model copy failed" }
-        }
+        AssetFiles.ensureCopied(context, MODEL_ASSET, model)
         handle = WhisperNative.nativeInit(model.absolutePath)
         check(handle != 0L) { "model load failed" }
         handle
