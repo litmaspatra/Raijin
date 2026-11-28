@@ -42,6 +42,8 @@ android {
         // never indistinguishable. Local builds stay above any shipped code.
         val ciRun = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
         val ciSha = System.getenv("GITHUB_SHA")?.take(7)
+        // VO-2: Whisper native library is arm64 only (the target phone); keeps the APK small.
+        ndk { abiFilters += "arm64-v8a" }
         versionCode = 1000 + (ciRun ?: 0)
         versionName = if (ciRun != null) "0.4.0-ci$ciRun+$ciSha" else "0.4.0-local"
     }
@@ -69,6 +71,15 @@ android {
             }
         }
     }
+
+    // VO-2: native Whisper build runs only when CI (or a developer) fetched whisper.cpp
+    // into src/main/cpp/whisper.cpp. Without it the app builds without on-device STT.
+    if (file("src/main/cpp/whisper.cpp/CMakeLists.txt").exists()) {
+        System.getenv("RAIJIN_NDK_VERSION")?.takeIf { it.isNotBlank() }?.let { ndkVersion = it }
+        externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+    }
+    // The bundled model must stay uncompressed so it opens quickly.
+    androidResources { noCompress += "bin" }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

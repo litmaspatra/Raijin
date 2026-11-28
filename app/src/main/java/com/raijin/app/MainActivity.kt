@@ -1426,6 +1426,14 @@ private fun MasterSettingsAndCommandDeck(
                                 onClear = { vaultStore.clear(); vaultLabel = null },
                             )
                             Spacer(Modifier.height(16.dp))
+                            val whisperStore = remember { com.raijin.app.audio.WhisperStore(context) }
+                            var whisperOn by remember { mutableStateOf(whisperStore.enabled) }
+                            com.raijin.app.ui.prefs.OnDeviceSpeechCard(
+                                enabled = whisperOn,
+                                available = remember { com.raijin.app.audio.WhisperEngine.isAvailable(context) },
+                                onEnabled = { whisperOn = it; whisperStore.enabled = it },
+                            )
+                            Spacer(Modifier.height(16.dp))
                             com.raijin.app.ui.prefs.ContactHistoryCard(
                                 enabled = historyOn,
                                 permissionGranted = historyGranted,

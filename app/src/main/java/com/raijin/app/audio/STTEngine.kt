@@ -48,7 +48,11 @@ class STTEngine(
     ) {
         scope.launch(Dispatchers.Main) {
             stopInternal()
-            createAndStart(onResult, onPartial, onError, onAlternatives)
+            if (WhisperStore(context).enabled && WhisperEngine.isAvailable(context)) {
+                startWhisper(onResult, onError, onAlternatives)
+            } else {
+                createAndStart(onResult, onPartial, onError, onAlternatives)
+            }
         }
     }
 
@@ -62,6 +66,26 @@ class STTEngine(
     // -------------------------------------------------------------------------
     // Internal
     // -------------------------------------------------------------------------
+
+    private val whisper by lazy { WhisperEngine(context, scope) }
+
+    /** VO-2: on-device Whisper path. No partials; the result arrives after the speaker stops. */
+    private fun startWhisper(
+        onResult: (String) -> Unit,
+        onError: (Int) -> Unit,
+        onAlternatives: ((List<String>) -> Unit)?,
+    ) {
+        val lang = when (com.raijin.app.prefs.UserPreferencesStore(context).explicitLanguage) {
+            com.raijin.app.prefs.UserPreferencesStore.Language.HINDI -> "hi"
+            com.raijin.app.prefs.UserPreferencesStore.Language.ENGLISH -> "en"
+            null -> if (Locale.getDefault().language == "hi") "hi" else "en"
+        }
+        whisper.startListening(
+            language = lang,
+            onResult = { text -> if (onAlternatives != null) onAlternatives(listOf(text)) else onResult(text) },
+            onError = { onError(SpeechRecognizer.ERROR_NO_MATCH) },
+        )
+    }
 
     private fun createAndStart(
         onResult:  (String) -> Unit,
@@ -166,6 +190,7 @@ class STTEngine(
     }
 
     private fun stopInternal() {
+        whisper.stop()
         recognizer?.let { sr ->
             try {
                 sr.stopListening()
