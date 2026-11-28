@@ -59,7 +59,7 @@ fun OnDeviceSpeechCard(
                 )
             }
             if (enabled && lastProblem != null) {
-                Text("Last on-device speech problem: $lastProblem. Raijin used the system recognizer instead.", color = RaijinText, fontSize = 10.sp)
+                Text("Last on-device speech note: $lastProblem.", color = RaijinText, fontSize = 10.sp)
             }
             if (enabled && !available) {
                 Text("This build has no bundled speech model, so the system recognizer is used.", color = RaijinText, fontSize = 10.sp)

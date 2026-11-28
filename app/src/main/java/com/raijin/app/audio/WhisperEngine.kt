@@ -118,8 +118,14 @@ class WhisperEngine(
                 return@launch
             }
             com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech: mic stopped, endpoint=${ep.state}")
-            if (!isActive) return@launch
+            val heard = "heard ${ep.heardMs} ms, loudest ${ep.peakRms.toInt()}, noise floor ${ep.noiseFloor.toInt()}, needed above ${ep.speechThreshold.toInt()}"
+            if (!isActive) {
+                WhisperStore(context).lastProblem = "listening was cancelled before it finished ($heard)"
+                return@launch
+            }
             if (ep.state != EnergyEndpointer.State.DONE) {
+                WhisperStore(context).lastProblem = "no speech detected ($heard)"
+
                 withContext(Dispatchers.Main) { onError(SttFailure.NO_SPEECH) }
                 return@launch
             }
@@ -141,8 +147,11 @@ class WhisperEngine(
                 ""
             }
             withContext(Dispatchers.Main) {
-                if (text.isNotEmpty()) onResult(text)
-                else onError(if (failure == SttFailure.TRANSCRIBE_FAILED && ranOk) SttFailure.EMPTY_TRANSCRIPT else failure)
+                if (text.isNotEmpty()) { WhisperStore(context).lastProblem = null; onResult(text) }
+                else {
+                    if (failure == SttFailure.TRANSCRIBE_FAILED && ranOk) WhisperStore(context).lastProblem = "speech model returned no words ($heard)"
+                    onError(if (failure == SttFailure.TRANSCRIBE_FAILED && ranOk) SttFailure.EMPTY_TRANSCRIPT else failure)
+                }
             }
         }
     }

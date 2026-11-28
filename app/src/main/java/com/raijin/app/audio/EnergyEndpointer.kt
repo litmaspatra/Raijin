@@ -15,6 +15,10 @@ class EnergyEndpointer(
     private val maxTotalMs: Int = 20000,
     private val minRms: Double = 350.0,
 ) {
+    /** Threshold a frame must beat to count as speech (for diagnostics). */
+    val speechThreshold: Double get() = maxOf(floor * 3.0, minRms)
+   
+
     enum class State { WAITING, SPEAKING, DONE, NO_SPEECH }
 
     private var frames = 0
@@ -25,10 +29,17 @@ class EnergyEndpointer(
     var state = State.WAITING
         private set
 
+    /** Diagnostics only: loudest frame so far, the noise floor, and audio heard so far. */
+    var peakRms = 0.0
+        private set
+    val noiseFloor: Double get() = floor
+    val heardMs: Int get() = frames * frameMs
+
     fun feed(frame: ShortArray, len: Int = frame.size): State {
         if (state == State.DONE || state == State.NO_SPEECH) return state
         frames++
         val rms = rms(frame, len)
+        if (rms > peakRms) peakRms = rms
         val elapsed = frames * frameMs
         if (frames <= noiseFrames) {
             // Average (not max) so the tap/beep at the start does not raise the bar,
