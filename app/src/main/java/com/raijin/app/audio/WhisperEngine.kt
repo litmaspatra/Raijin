@@ -80,9 +80,15 @@ class WhisperEngine(
             val pcm = ArrayList<ShortArray>()
             val ep = EnergyEndpointer()
             var micProblem: String? = null
+            var stateAfterStart: Int? = null
+            var reads = 0
+            var silentReads = 0
+            var negativeRead: Int? = null
+            var silenced: Boolean? = null
             try {
                 com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech: mic starting")
                 rec.startRecording()
+                stateAfterStart = rec.recordingState
                 if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                     // Some phones need a moment, or refuse (mic busy / blocked in background). Retry once.
                     kotlinx.coroutines.delay(200)
@@ -96,10 +102,15 @@ class WhisperEngine(
                     var zeroReads = 0
                     while (isActive) {
                         val n = rec.read(buf, 0, buf.size)
-                        if (n < 0) { micProblem = "mic read error $n (state ${rec.recordingState})"; break }
+                        if (n < 0) { negativeRead = n; micProblem = "mic read error $n (state ${rec.recordingState})"; break }
                         if (n == 0) { if (++zeroReads > 40) { micProblem = "mic returned no audio"; break }; continue }
                         zeroReads = 0
                         val chunk = buf.copyOf(n)
+                        reads++
+                        if (chunk.all { it.toInt() == 0 }) silentReads++
+                        if (reads == 10 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                            silenced = runCatching { rec.activeRecordingConfiguration?.isClientSilenced }.getOrNull()
+                        }
                         pcm += chunk
                         val s = ep.feed(chunk, n)
                         if (s == EnergyEndpointer.State.DONE || s == EnergyEndpointer.State.NO_SPEECH) break
@@ -110,6 +121,14 @@ class WhisperEngine(
             } finally {
                 runCatching { rec.stop() }
                 rec.release()
+                val importance = runCatching {
+                    val st = android.app.ActivityManager.RunningAppProcessInfo()
+                    android.app.ActivityManager.getMyMemoryState(st)
+                    st.importance
+                }.getOrNull()
+                WhisperStore(context).lastListen = ListenDiagnostics.describe(
+                    stateAfterStart, reads, silentReads, negativeRead, silenced, importance, MicState.serviceHasMicType,
+                )
             }
             if (micProblem != null) {
                 Log.w(TAG, micProblem)

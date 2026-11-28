@@ -31,6 +31,7 @@ fun OnDeviceSpeechCard(
     available: Boolean,
     onEnabled: (Boolean) -> Unit,
     lastProblem: String? = null,
+    lastListen: String? = null,
 ) {
     Surface(shape = RoundedCornerShape(12.dp), color = RaijinSurface, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -57,6 +58,9 @@ fun OnDeviceSpeechCard(
                     onCheckedChange = onEnabled,
                     colors = SwitchDefaults.colors(checkedTrackColor = RaijinBlue, uncheckedTrackColor = RaijinTextDim),
                 )
+            }
+            if (enabled && lastListen != null) {
+                Text("Last microphone check: $lastListen.", color = RaijinText, fontSize = 10.sp)
             }
             if (enabled && lastProblem != null) {
                 Text("Last on-device speech note: $lastProblem.", color = RaijinText, fontSize = 10.sp)

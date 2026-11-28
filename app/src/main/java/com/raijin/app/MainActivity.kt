@@ -1301,6 +1301,7 @@ private fun MasterSettingsAndCommandDeck(
                                 available = remember { com.raijin.app.audio.WhisperEngine.isAvailable(context) },
                                 onEnabled = { whisperOn = it; whisperStore.enabled = it },
                                 lastProblem = whisperStore.lastProblem,
+                                lastListen = whisperStore.lastListen,
                             )
                             Spacer(Modifier.height(16.dp))
                             com.raijin.app.ui.prefs.ContactHistoryCard(
