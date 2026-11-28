@@ -7,7 +7,7 @@ import java.io.InputStream
 /**
  * Copies a bundled asset to a real file once. Uses only a plain stream: assets that the build
  * stores compressed (such as .txt files) cannot be opened as a file descriptor, so the old
- * size check through openFd failed for them. A small marker file records which app install the
+ * size check through a file descriptor failed for them. A small marker file records which app install the
  * copy came from, so a new APK refreshes the copy.
  */
 object AssetFiles {
