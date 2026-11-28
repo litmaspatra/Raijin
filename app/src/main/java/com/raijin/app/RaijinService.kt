@@ -268,6 +268,17 @@ class RaijinService : Service() {
             actuator = actuator,
             cloudReasoning = cloudClient,
             speakSentence = { sentence -> tts.speakQueued(sentence) },
+            cloudContext = {
+                val prefs = com.raijin.app.prefs.UserPreferencesStore(this)
+                if (!prefs.shareContextWithCloud) {
+                    ""
+                } else {
+                    val facts = database.memoryDao().getAll().filter { it.kind == "FACT" }.map { it.text }
+                    val skills = runCatching { skillRunner.manifests() }.getOrDefault(emptyList())
+                        .map { io.raijin.brain.CloudContext.Entry(it.name, it.description) }
+                    io.raijin.brain.CloudContext.build(facts, prefs.addressTerm, skills)
+                }
+            },
         )
         brainInstance = brain
 
