@@ -97,6 +97,7 @@ class KokoroAudioClient(
         try {
             for (sentence in splitSentences(text)) {
                 if (!scope.isActive || job?.isActive == false) return false
+                com.raijin.app.crash.CrashCapture.breadcrumb(context, "voice: synthesizing")
                 val audio = engine.synthesize(sentence, voice.sid, cfg.speed)
                 if (audio.samples.isEmpty()) continue
                 if (out == null) {
@@ -154,18 +155,14 @@ class KokoroAudioClient(
         val dir = File(context.filesDir, "kokoro").apply { mkdirs() }
         for (name in KokoroAssets.ALL) {
             val path = "${KokoroAssets.ASSET_DIR}/$name"
-            val target = File(dir, name)
-            val expected = context.assets.openFd(path).use { it.length }
-            if (!target.exists() || target.length() != expected) {
-                val tmp = File(dir, "$name.part")
-                context.assets.open(path).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
-                check(tmp.renameTo(target)) { "copy failed: $name" }
-            }
+            AssetFiles.ensureCopied(context, path, File(dir, name))
         }
+        com.raijin.app.crash.CrashCapture.breadcrumb(context, "voice: loading native")
         val engine = Class.forName(KokoroAssets.ENGINE_CLASS).getConstructor(File::class.java).newInstance(dir) as KokoroSynth
         val words = File(dir, KokoroAssets.LEXICON).useLines { SpokenLexicon.parse(it) }
         synth = engine
         lexicon = words
+        com.raijin.app.crash.CrashCapture.breadcrumb(context, "voice: loaded")
         engine to words
     }
 

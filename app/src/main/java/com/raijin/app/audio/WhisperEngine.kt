@@ -43,13 +43,11 @@ class WhisperEngine(
         if (handle != 0L) return handle
         val dir = File(context.filesDir, "whisper").apply { mkdirs() }
         val model = File(dir, File(MODEL_ASSET).name)
-        val expected = context.assets.openFd(MODEL_ASSET).use { it.length }
-        if (!model.exists() || model.length() != expected) {
-            val tmp = File(dir, model.name + ".part")
-            context.assets.open(MODEL_ASSET).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
-            check(tmp.renameTo(model)) { "model copy failed" }
-        }
+        com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech model: copying")
+        AssetFiles.ensureCopied(context, MODEL_ASSET, model)
+        com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech model: loading native")
         handle = WhisperNative.nativeInit(model.absolutePath)
+        com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech model: loaded")
         check(handle != 0L) { "model load failed" }
         handle
     }
@@ -83,6 +81,7 @@ class WhisperEngine(
             val ep = EnergyEndpointer()
             var micProblem: String? = null
             try {
+                com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech: mic starting")
                 rec.startRecording()
                 if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                     // Some phones need a moment, or refuse (mic busy / blocked in background). Retry once.
@@ -118,6 +117,7 @@ class WhisperEngine(
                 withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
                 return@launch
             }
+            com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech: mic stopped, endpoint=${ep.state}")
             if (!isActive) return@launch
             if (ep.state != EnergyEndpointer.State.DONE) {
                 withContext(Dispatchers.Main) { onError(SttFailure.NO_SPEECH) }
@@ -131,6 +131,7 @@ class WhisperEngine(
             var ranOk = false
             val text = try {
                 val h = ensureLoaded()
+                com.raijin.app.crash.CrashCapture.breadcrumb(context, "speech: transcribing")
                 val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
                 WhisperNative.nativeTranscribe(h, EnergyEndpointer.toFloat(all), language, threads).trim().also { ranOk = true }
             } catch (e: Throwable) {
