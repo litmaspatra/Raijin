@@ -1411,7 +1411,7 @@ private fun MasterSettingsAndCommandDeck(
                                 androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
                             ) { granted -> historyGranted = granted }
                             val vaultStore = remember { com.raijin.app.obsidian.ObsidianVaultStore(context) }
-                            var vaultPath by remember { mutableStateOf(vaultStore.vaultRoot ?: com.raijin.app.obsidian.VaultRootCheck.SUGGESTED) }
+                            var vaultPath by remember { mutableStateOf(vaultStore.vaultRoot ?: "") }
                             var vaultStatus by remember {
                                 mutableStateOf(vaultStore.vaultRoot?.let { "Vault set: $it" } ?: "Not set yet. Nothing is written until you save a folder.")
                             }

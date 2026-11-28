@@ -5,7 +5,7 @@ import org.junit.Test
 
 class VaultRootCheckTest {
     @Test fun existingFolderIsAcceptedAndTrimmed() =
-        assertEquals(VaultRootCheck.Result.Ok("/sdcard/ObsidianVault"), VaultRootCheck.check(" /sdcard/ObsidianVault/ ") { true })
+        assertEquals(VaultRootCheck.Result.Ok("/sdcard/MyVault"), VaultRootCheck.check(" /sdcard/MyVault/ ") { true })
 
     @Test fun missingFolderIsRefused() =
         assertEquals(VaultRootCheck.Result.NotFound, VaultRootCheck.check("/sdcard/Nope") { false })

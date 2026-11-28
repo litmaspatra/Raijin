@@ -11,8 +11,6 @@ object VaultRootCheck {
         object NotFound : Result
     }
 
-    const val SUGGESTED = "/sdcard/ObsidianVault"
-
     fun check(input: String, isDir: (File) -> Boolean = { it.isDirectory }): Result {
         val p = input.trim().trimEnd('/')
         if (p.isEmpty()) return Result.Empty
