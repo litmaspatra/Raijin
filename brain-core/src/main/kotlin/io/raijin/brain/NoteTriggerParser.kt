@@ -18,7 +18,7 @@ object NoteTriggerParser {
     )
 
     private val VERB_NOTE = Regex(
-        """^(?:write|take|make|create|jot(?:\s+down)?|put\s+down)\s+(?:me\s+)?(?:a\s+)?note\s*(?::|that|saying)?\s+(.+)$""",
+        """^(?:write|take|make|create|jot(?:\s+down)?|put\s+down)\s+(?:me\s+)?(?:a\s+|another\s+)?(?:new\s+|quick\s+)?note\s*(?::|that|saying)?\s+(.+)$""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -31,6 +31,14 @@ object NoteTriggerParser {
         """^(?:obsidian|in\s+obsidian|to\s+(?:my\s+)?obsidian)\s*(?::)?\s+(.+)$""",
         RegexOption.IGNORE_CASE,
     )
+
+    /** "make a new note" with nothing to put in it yet: the app asks what the note should say. */
+    private val BARE = Regex(
+        """^(?:please\s+)?(?:write|take|make|create|start|jot\s+down|put\s+down)\s+(?:me\s+)?(?:a\s+|another\s+)?(?:new\s+|quick\s+)?note(?:\s+(?:in|to|for)\s+(?:my\s+)?obsidian)?(?:\s+please)?[.!]?$|^(?:new|quick)\s+note[.!]?$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    fun isBare(text: String): Boolean = BARE.matches(text.trim())
 
     /** True when the utterance is a note request (probe predicate). */
     fun matches(text: String): Boolean = extract(text) != null
