@@ -68,6 +68,7 @@ class RaijinTTS(context: Context) {
 
     fun speak(rawText: String, onDone: ((Boolean) -> Unit)? = null) {
         val text = addr(rawText)
+        queue.clear()
         // Skip if silent/vibrate
         if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) {
             Log.d(TAG, "Ringer silent — skipping speech synthesis")
@@ -80,8 +81,10 @@ class RaijinTTS(context: Context) {
             Log.d(TAG, "Attempting Kokoro voice synthesis...")
             kokoroClient.speak(text) { success ->
                 if (success) {
+                    kokoroConfigStore.lastFallback = null
                     onDone?.invoke(true)
                 } else {
+                    kokoroConfigStore.lastFallback = "system voice used: ${kokoroClient.lastProblem ?: "on-device voice did not finish"}"
                     Log.d(TAG, "Kokoro synthesis unavailable, falling back to native TTS")
                     speakWithNativeTts(text, onDone)
                 }
@@ -89,6 +92,7 @@ class RaijinTTS(context: Context) {
             return
         }
 
+        recordFallback(text)
         speakWithNativeTts(text, onDone)
     }
 
@@ -99,7 +103,44 @@ class RaijinTTS(context: Context) {
     fun speakQueued(rawText: String) {
         val text = addr(rawText)
         if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
-        speakWithNativeTts(text, null, flush = false)
+        if (!kokoroClient.isAvailable || isHindi(text)) {
+            // Keep order if earlier sentences are still queued for the on-device voice.
+            if (queue.isBusy) { queue.enqueue(text); return }
+            recordFallback(text)
+            speakWithNativeTts(text, null, flush = false)
+            return
+        }
+        queue.enqueue(text)
+    }
+
+    /** Plays one queued sentence to the end: on-device voice first, then the system voice if that fails. */
+    private fun playQueuedSentence(text: String) {
+        if (kokoroClient.isAvailable && !isHindi(text)) {
+            val done = java.util.concurrent.CountDownLatch(1)
+            var ok = false
+            kokoroClient.speak(text) { success -> ok = success; done.countDown() }
+            done.await(90, java.util.concurrent.TimeUnit.SECONDS)
+            if (ok) { kokoroConfigStore.lastFallback = null; return }
+            kokoroConfigStore.lastFallback = "system voice used: ${kokoroClient.lastProblem ?: "on-device voice did not finish"}"
+        } else {
+            recordFallback(text)
+        }
+        val done = java.util.concurrent.CountDownLatch(1)
+        speakWithNativeTts(text, { done.countDown() }, flush = false)
+        done.await(60, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
+    private val queue = SpeechQueue { playQueuedSentence(it) }
+
+    /** Why this text used the system voice, kept for the voice card. */
+    private fun recordFallback(text: String) {
+        val cfg = kokoroConfigStore.load()
+        kokoroConfigStore.lastFallback = when {
+            !cfg.enabled -> null
+            isHindi(text) -> "system voice used: Hindi text"
+            !KokoroAssets.engineAvailable() || !KokoroAssets.bundled(appContext) -> "system voice used: voice files not in this build"
+            else -> null
+        }
     }
 
     private fun speakWithNativeTts(text: String, onDone: ((Boolean) -> Unit)?, flush: Boolean = true) {
@@ -152,6 +193,7 @@ class RaijinTTS(context: Context) {
     val isSpeaking: Boolean get() = tts?.isSpeaking == true
 
     fun stop() {
+        queue.clear()
         utteranceCallbacks.clear()
         kokoroClient.stop()
         tts?.stop()

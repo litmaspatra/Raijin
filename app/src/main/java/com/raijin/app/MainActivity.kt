@@ -1011,7 +1011,7 @@ private fun MasterSettingsAndCommandDeck(
                                 }
                             },
                             status = kokoroTestStatus,
-                            lastProblem = kokoroTester.lastProblem,
+                            lastProblem = kokoroTester.lastProblem ?: kokoroStore.lastFallback,
                         )
 
                         Spacer(Modifier.height(16.dp))
