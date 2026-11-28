@@ -47,3 +47,15 @@ class EnergyEndpointerTest {
         assertTrue(f[0] == 0.5f && f[1] == -1.0f)
     }
 }
+
+class EnergyEndpointerFloorTest {
+    private fun frame(amp: Int) = ShortArray(480) { if (it % 2 == 0) amp.toShort() else (-amp).toShort() }
+
+    @Test fun tapNoiseAtStartDoesNotHideSpeech() {
+        val ep = EnergyEndpointer()
+        repeat(2) { ep.feed(frame(6000)) } // tap/beep burst in the first frames
+        repeat(6) { ep.feed(frame(30)) }
+        repeat(15) { ep.feed(frame(2500)) } // normal speech
+        assertEquals(EnergyEndpointer.State.SPEAKING, ep.state)
+    }
+}

@@ -48,13 +48,20 @@ class STTEngine(
     ) {
         scope.launch(Dispatchers.Main) {
             stopInternal()
-            if (WhisperStore(context).enabled && WhisperEngine.isAvailable(context)) {
+            if (WhisperStore(context).enabled && !WhisperNative.available) {
+                onError(SttFailure.WHISPER_NO_NATIVE)
+            } else if (WhisperStore(context).enabled && !WhisperEngine.modelBundled(context)) {
+                onError(SttFailure.WHISPER_NO_MODEL)
+            } else if (WhisperStore(context).enabled) {
                 startWhisper(onResult, onError, onAlternatives)
             } else {
                 createAndStart(onResult, onPartial, onError, onAlternatives)
             }
         }
     }
+
+    /** True when the next listen uses on-device Whisper (it needs more time than the system recognizer). */
+    fun usesWhisper(): Boolean = WhisperStore(context).enabled && WhisperEngine.isAvailable(context)
 
     /** Immediately cancel any ongoing recognition session. */
     fun stop() {
@@ -83,7 +90,7 @@ class STTEngine(
         whisper.startListening(
             language = lang,
             onResult = { text -> if (onAlternatives != null) onAlternatives(listOf(text)) else onResult(text) },
-            onError = { onError(SpeechRecognizer.ERROR_NO_MATCH) },
+            onError = { code -> onError(code) },
         )
     }
 
@@ -95,7 +102,7 @@ class STTEngine(
     ) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             Log.w(TAG, "Speech recognition not available on this device")
-            onError(SpeechRecognizer.ERROR_CLIENT)
+            onError(SttFailure.NO_RECOGNIZER)
             return
         }
 

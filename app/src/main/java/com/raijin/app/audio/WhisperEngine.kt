@@ -56,7 +56,7 @@ class WhisperEngine(
 
     /** [language]: "en", "hi" or "auto". Callbacks arrive on the main thread. */
     @SuppressLint("MissingPermission")
-    fun startListening(language: String, onResult: (String) -> Unit, onError: () -> Unit) {
+    fun startListening(language: String, onResult: (String) -> Unit, onError: (Int) -> Unit) {
         stop()
         job = scope.launch(Dispatchers.Default) {
             val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -69,12 +69,12 @@ class WhisperEngine(
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "mic init failed: ${e.javaClass.simpleName}")
-                withContext(Dispatchers.Main) { onError() }
+                withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
                 return@launch
             }
             if (rec.state != AudioRecord.STATE_INITIALIZED) {
                 rec.release()
-                withContext(Dispatchers.Main) { onError() }
+                withContext(Dispatchers.Main) { onError(SttFailure.MIC_UNAVAILABLE) }
                 return@launch
             }
             val pcm = ArrayList<ShortArray>()
@@ -96,22 +96,28 @@ class WhisperEngine(
             }
             if (!isActive) return@launch
             if (ep.state != EnergyEndpointer.State.DONE) {
-                withContext(Dispatchers.Main) { onError() }
+                withContext(Dispatchers.Main) { onError(SttFailure.NO_SPEECH) }
                 return@launch
             }
             val total = pcm.sumOf { it.size }
             val all = ShortArray(total)
             var o = 0
             for (c in pcm) { c.copyInto(all, o); o += c.size }
+            var failure = SttFailure.TRANSCRIBE_FAILED
+            var ranOk = false
             val text = try {
                 val h = ensureLoaded()
                 val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-                WhisperNative.nativeTranscribe(h, EnergyEndpointer.toFloat(all), language, threads).trim()
+                WhisperNative.nativeTranscribe(h, EnergyEndpointer.toFloat(all), language, threads).trim().also { ranOk = true }
             } catch (e: Throwable) {
                 Log.w(TAG, "transcribe failed: ${e.javaClass.simpleName}")
+                failure = SttFailure.TRANSCRIBE_FAILED
                 ""
             }
-            withContext(Dispatchers.Main) { if (text.isNotEmpty()) onResult(text) else onError() }
+            withContext(Dispatchers.Main) {
+                if (text.isNotEmpty()) onResult(text)
+                else onError(if (failure == SttFailure.TRANSCRIBE_FAILED && ranOk) SttFailure.EMPTY_TRANSCRIPT else failure)
+            }
         }
     }
 
