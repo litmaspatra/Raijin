@@ -3,249 +3,211 @@ package com.raijin.app.audio
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.AudioAttributes
-import android.media.MediaPlayer
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
 
-/**
- * Kokoro Neural Voice Synthesis Client.
- *
- * Uses the Kokoro-82M text-to-speech specification (OpenAI /v1/audio/speech format)
- * to deliver ultra-natural sci-fi companion voices (Karen: af_heart, F.R.I.D.A.Y.: bf_emma,
- * Jarvis: bm_george, etc.).
- *
- * Supports hosted Kokoro endpoints (DeepInfra, HuggingFace, Fal.ai, or custom local/Docker).
- */
+/** Settings for the on-device English Kokoro voice. Nothing here leaves the phone. */
 data class KokoroVoiceConfig(
-    val endpointUrl: String = "https://api.deepinfra.com/v1/openai/audio/speech",
-    val apiKey: String = "",
-    val voice: String = DEFAULT_VOICE,
+    val voice: String = KokoroVoices.DEFAULT.id,
     val speed: Float = 1.0f,
-    val enabled: Boolean = true,
-) {
-    companion object {
-        const val DEFAULT_VOICE = "af_heart" // Karen style: warm expressive female
+    val enabled: Boolean = false,
+)
 
-        val AVAILABLE_VOICES = listOf(
-            KokoroVoiceOption("af_heart", "Karen // Warm American Female (Default)"),
-            KokoroVoiceOption("bf_emma", "F.R.I.D.A.Y. // British Female"),
-            KokoroVoiceOption("af_bella", "Bella // Upbeat Female"),
-            KokoroVoiceOption("af_sarah", "Sarah // Crisp Female"),
-            KokoroVoiceOption("am_adam", "Adam // Direct American Male"),
-            KokoroVoiceOption("bm_george", "Jarvis // British Male"),
-        )
-    }
+/** File names of the bundled Kokoro files (assets/models/kokoro/, fetched by CI, never committed). */
+object KokoroAssets {
+    const val ASSET_DIR = "models/kokoro"
+    const val MODEL = "model.int8.onnx"
+    const val VOICES = "voices.bin"
+    const val TOKENS = "tokens.txt"
+    const val LEXICON = "lexicon-us-en.txt"
+    val ALL = listOf(MODEL, VOICES, TOKENS, LEXICON)
+    const val ENGINE_CLASS = "com.raijin.app.audio.SherpaKokoroSynth"
+
+    fun bundled(context: Context): Boolean =
+        ALL.all { name -> runCatching { context.assets.open("$ASSET_DIR/$name").use { true } }.getOrDefault(false) }
+
+    fun engineAvailable(): Boolean = runCatching { Class.forName(ENGINE_CLASS); true }.getOrDefault(false)
 }
 
-data class KokoroVoiceOption(val id: String, val label: String)
-
+/**
+ * On-device Kokoro speech (English only). Synthesizes sentence by sentence with sherpa-onnx and
+ * streams the audio to the speaker. If the voice is off, not bundled, or a sentence has a word
+ * the word list cannot pronounce, [speak] reports failure so the system voice reads it instead.
+ * No network code in this class.
+ */
 class KokoroAudioClient(
     private val context: Context,
     private val configProvider: () -> KokoroVoiceConfig,
 ) {
     companion object {
         private const val TAG = "KokoroAudioClient"
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private val lock = Any()
+        private var synth: KokoroSynth? = null
+        private var lexicon: SpokenLexicon? = null
     }
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var job: Job? = null
+    @Volatile private var track: AudioTrack? = null
 
-    private val clientScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var activePlayer: MediaPlayer? = null
-    private var activeTempFile: File? = null
+    /** Last short reason the voice fell back to the system voice, for the settings card. */
+    @Volatile var lastProblem: String? = null
+        private set
 
     val isAvailable: Boolean
-        get() {
-            val cfg = configProvider()
-            return cfg.enabled && cfg.endpointUrl.isNotBlank()
-        }
+        get() = configProvider().enabled && KokoroAssets.engineAvailable() && KokoroAssets.bundled(context)
 
-    /**
-     * Synthesizes audio using Kokoro voices and plays it through MediaPlayer.
-     * [onDone] is invoked on the main thread with true if the audio was synthesized and
-     * played to completion, false if anything failed.
-     */
+    /** [onDone] runs on the main thread: true when the speech played to the end, false if the caller should fall back. */
     fun speak(text: String, onDone: ((Boolean) -> Unit)? = null) {
-        val config = configProvider()
-        if (!config.enabled || config.endpointUrl.isBlank()) {
-            onDone?.invoke(false)
-            return
-        }
-
-        clientScope.launch {
-            val tempAudioFile = File(context.cacheDir, "kokoro_cache_${System.currentTimeMillis()}.mp3")
-            try {
-                val payload = JSONObject().apply {
-                    put("model", "kokoro")
-                    put("input", text)
-                    put("voice", config.voice)
-                    put("speed", config.speed.toDouble())
-                    put("response_format", "mp3")
-                }
-
-                val reqBuilder = Request.Builder()
-                    .url(config.endpointUrl)
-                    .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                    .addHeader("Content-Type", "application/json")
-
-                if (config.apiKey.isNotBlank()) {
-                    reqBuilder.addHeader("Authorization", "Bearer ${config.apiKey.trim()}")
-                }
-
-                Log.d(TAG, "Requesting Kokoro speech [voice: ${config.voice}] for: '${text.take(40)}...'")
-
-                val downloaded = httpClient.newCall(reqBuilder.build()).execute().use { resp ->
-                    if (!resp.isSuccessful) {
-                        Log.w(TAG, "Kokoro synthesis returned HTTP ${resp.code}: ${resp.body?.string()?.take(100)}")
-                        false
-                    } else {
-                        val inputStream = resp.body?.byteStream()
-                        if (inputStream == null) {
-                            false
-                        } else {
-                            FileOutputStream(tempAudioFile).use { out -> inputStream.copyTo(out) }
-                            true
-                        }
-                    }
-                }
-
-                if (!downloaded) {
-                    tempAudioFile.delete()
-                    withContext(Dispatchers.Main) { onDone?.invoke(false) }
-                    return@launch
-                }
-
-                withContext(Dispatchers.Main) { playAudioFile(tempAudioFile, onDone) }
-            } catch (e: Exception) {
-                Log.w(TAG, "Kokoro audio generation failed: ${e.message}")
-                tempAudioFile.delete()
-                withContext(Dispatchers.Main) { onDone?.invoke(false) }
+        val cfg = configProvider()
+        if (!cfg.enabled) { onDone?.invoke(false); return }
+        stop()
+        job = scope.launch {
+            val ok = try {
+                play(text, cfg)
+            } catch (e: Throwable) {
+                lastProblem = "${e.javaClass.simpleName}: ${e.message?.take(80)}"
+                Log.w(TAG, "Kokoro speech failed: ${e.message}")
+                false
             }
+            withContext(Dispatchers.Main) { onDone?.invoke(ok) }
         }
     }
 
-    /** Must be called on the main thread. */
-    private fun playAudioFile(audioFile: File, onDone: ((Boolean) -> Unit)?) {
-        var player: MediaPlayer? = null
-        try {
-            stop()
-            activeTempFile = audioFile
-            player = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                        .build()
-                )
-                setDataSource(audioFile.absolutePath)
-                setOnPreparedListener { it.start() }
-                setOnCompletionListener { mp ->
-                    mp.release()
-                    if (activePlayer === mp) activePlayer = null
-                    audioFile.delete()
-                    if (activeTempFile == audioFile) activeTempFile = null
-                    onDone?.invoke(true)
-                }
-                setOnErrorListener { mp, what, extra ->
-                    Log.w(TAG, "MediaPlayer error: what=$what, extra=$extra")
-                    mp.release()
-                    if (activePlayer === mp) activePlayer = null
-                    audioFile.delete()
-                    if (activeTempFile == audioFile) activeTempFile = null
-                    onDone?.invoke(false)
-                    true
-                }
-                prepareAsync()
-            }
-            activePlayer = player
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed playing synthesized audio: ${e.message}", e)
-            try { player?.release() } catch (_: Exception) {}
-            activePlayer = null
-            audioFile.delete()
-            if (activeTempFile == audioFile) activeTempFile = null
-            onDone?.invoke(false)
+    private fun play(text: String, cfg: KokoroVoiceConfig): Boolean {
+        val (engine, words) = ensureLoaded() ?: return false
+        val unknown = words.unknownWords(text)
+        if (unknown.isNotEmpty()) {
+            lastProblem = "word not in voice list: ${unknown.first().take(20)}"
+            return false
         }
+        val voice = KokoroVoices.byId(cfg.voice)
+        var out: AudioTrack? = null
+        var frames = 0L
+        try {
+            for (sentence in splitSentences(text)) {
+                if (!scope.isActive || job?.isActive == false) return false
+                val audio = engine.synthesize(sentence, voice.sid, cfg.speed)
+                if (audio.samples.isEmpty()) continue
+                if (out == null) {
+                    out = newTrack(audio.sampleRate)
+                    track = out
+                    out.play()
+                }
+                out.write(audio.samples, 0, audio.samples.size, AudioTrack.WRITE_BLOCKING)
+                frames += audio.samples.size
+            }
+            val t = out ?: return false
+            val deadline = System.currentTimeMillis() + 60_000
+            while (t.playbackHeadPosition < frames && System.currentTimeMillis() < deadline && job?.isActive == true) {
+                Thread.sleep(40)
+            }
+            lastProblem = null
+            return true
+        } finally {
+            runCatching { out?.stop() }
+            runCatching { out?.release() }
+            if (track === out) track = null
+        }
+    }
+
+    private fun newTrack(sampleRate: Int): AudioTrack {
+        val min = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT)
+        return AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build(),
+            )
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setBufferSizeInBytes(maxOf(min, sampleRate * 4))
+            .build()
+    }
+
+    /** Copies the bundled files to private storage once, loads the engine and the word list. */
+    private fun ensureLoaded(): Pair<KokoroSynth, SpokenLexicon>? = synchronized(lock) {
+        val s = synth
+        val l = lexicon
+        if (s != null && l != null) return s to l
+        if (!KokoroAssets.engineAvailable() || !KokoroAssets.bundled(context)) {
+            lastProblem = "voice not bundled in this build"
+            return null
+        }
+        val dir = File(context.filesDir, "kokoro").apply { mkdirs() }
+        for (name in KokoroAssets.ALL) {
+            val path = "${KokoroAssets.ASSET_DIR}/$name"
+            val target = File(dir, name)
+            val expected = context.assets.openFd(path).use { it.length }
+            if (!target.exists() || target.length() != expected) {
+                val tmp = File(dir, "$name.part")
+                context.assets.open(path).use { i -> tmp.outputStream().use { o -> i.copyTo(o) } }
+                check(tmp.renameTo(target)) { "copy failed: $name" }
+            }
+        }
+        val engine = Class.forName(KokoroAssets.ENGINE_CLASS).getConstructor(File::class.java).newInstance(dir) as KokoroSynth
+        val words = File(dir, KokoroAssets.LEXICON).useLines { SpokenLexicon.parse(it) }
+        synth = engine
+        lexicon = words
+        engine to words
     }
 
     fun stop() {
-        try {
-            activePlayer?.stop()
-        } catch (_: Exception) {}
-        try {
-            activePlayer?.release()
-        } catch (_: Exception) {}
-        activePlayer = null
-        try {
-            activeTempFile?.delete()
-        } catch (_: Exception) {}
-        activeTempFile = null
+        job?.cancel()
+        job = null
+        val t = track
+        track = null
+        runCatching { t?.pause(); t?.flush(); t?.stop(); t?.release() }
     }
 
     fun shutdown() {
         stop()
-        clientScope.cancel()
+        scope.cancel()
     }
 }
 
-/**
- * Storage for Kokoro Voice persona configuration. Non-secret fields stay in
- * SharedPreferences; the API key is Keystore-encrypted (PRD section 6), with a
- * one-time migration from the legacy plaintext value.
- */
+/** Splits text into sentences so playback can start after the first one is ready. */
+internal fun splitSentences(text: String): List<String> =
+    text.split(Regex("(?<=[.!?])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+
+/** Stores the on-device voice settings. Off by default; a stored hosted-endpoint key from older builds is erased. */
 class KokoroConfigStore(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("raijin_kokoro_voice", Context.MODE_PRIVATE)
-    private val secrets = com.raijin.app.cloud.KeystoreSecretStore()
 
-    fun load(): KokoroVoiceConfig {
-        return KokoroVoiceConfig(
-            endpointUrl = prefs.getString("endpoint_url", "https://api.deepinfra.com/v1/openai/audio/speech") ?: "https://api.deepinfra.com/v1/openai/audio/speech",
-            apiKey = loadApiKey(),
-            voice = prefs.getString("voice", KokoroVoiceConfig.DEFAULT_VOICE) ?: KokoroVoiceConfig.DEFAULT_VOICE,
-            speed = prefs.getFloat("speed", 1.0f),
-            enabled = prefs.getBoolean("enabled", true),
-        )
-    }
-
-    private fun loadApiKey(): String {
-        secrets.decrypt(prefs.getString("api_key_enc", null))?.let { return it }
-        val legacy = prefs.getString("api_key", "") ?: ""
-        if (legacy.isNotBlank()) {
-            secrets.encrypt(legacy)?.let { enc ->
-                prefs.edit().putString("api_key_enc", enc).remove("api_key").apply()
-            }
-            return legacy
+    init {
+        if (prefs.contains("api_key_enc") || prefs.contains("api_key") || prefs.contains("endpoint_url")) {
+            prefs.edit().remove("api_key_enc").remove("api_key").remove("endpoint_url").remove("enabled").apply()
         }
-        return ""
     }
+
+    fun load(): KokoroVoiceConfig = KokoroVoiceConfig(
+        voice = KokoroVoices.byId(prefs.getString("voice", null)).id,
+        speed = prefs.getFloat("speed", 1.0f),
+        enabled = prefs.getBoolean("local_enabled", false),
+    )
 
     fun save(config: KokoroVoiceConfig) {
-        val encryptedKey = secrets.encrypt(config.apiKey.trim())
         prefs.edit()
-            .putString("endpoint_url", config.endpointUrl.trim())
-            .putString("voice", config.voice.trim())
+            .putString("voice", KokoroVoices.byId(config.voice).id)
             .putFloat("speed", config.speed)
-            .putBoolean("enabled", config.enabled)
-            .apply {
-                if (encryptedKey != null) putString("api_key_enc", encryptedKey) else remove("api_key_enc")
-                remove("api_key") // never keep a plaintext copy
-            }
+            .putBoolean("local_enabled", config.enabled)
             .apply()
     }
 }

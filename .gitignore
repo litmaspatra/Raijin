@@ -14,3 +14,7 @@ build-output/
 # VO-2: fetched by CI at build time (pinned + checksum-verified), never committed
 app/src/main/cpp/whisper.cpp/
 app/src/main/assets/models/
+
+# Kokoro on-device voice: sherpa-onnx AAR and model files fetched by CI, never committed
+app/libs/
+app/src/main/assets/models/kokoro/

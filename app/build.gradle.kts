@@ -79,7 +79,7 @@ android {
         externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
     }
     // The bundled model must stay uncompressed so it opens quickly.
-    androidResources { noCompress += "bin" }
+    androidResources { noCompress += listOf("bin", "onnx") }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -99,6 +99,15 @@ android {
     // is already excluded from compilation by default. No sourceSets override needed.
 
     testOptions { unitTests.isIncludeAndroidResources = true }
+
+    // On-device Kokoro voice: sherpa-onnx (Apache-2.0) AAR fetched by CI into app/libs (pinned,
+    // checksum-verified, never committed). Without it the engine class is left out of the build and
+    // the app speaks with the system voice only.
+    if (!file("libs/sherpa-onnx-2.0.3.aar").exists()) {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            exclude("**/SherpaKokoroSynth.kt")
+        }
+    }
 
     if (!renderTests) {
         // Lightweight mode: omit the 6 render test files (see renderTests doc).
@@ -129,6 +138,7 @@ android {
 }
 
 dependencies {
+    file("libs/sherpa-onnx-2.0.3.aar").takeIf { it.exists() }?.let { implementation(files(it)) }
     // Brain contract & core — pure Kotlin assistant brain
     implementation(project(":brain-contract"))
     implementation(project(":brain-core"))

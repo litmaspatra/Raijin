@@ -196,6 +196,26 @@ jobs:
           echo "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898  app/src/main/assets/models/ggml-base-q5_1.bin" | sha256sum -c -
           echo "RAIJIN_NDK_VERSION=$(basename "${ANDROID_NDK_LATEST_HOME:-}")" >> "$GITHUB_ENV"
           ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake" || true
+      - name: Fetch on-device Kokoro voice (pinned, checksum-verified, not committed)
+        # English Kokoro v1.0 int8 (Apache-2.0 weights), two voices only, run by sherpa-onnx 2.0.3
+        # (Apache-2.0). No espeak-ng (GPL) is fetched or bundled. All downloads are free public
+        # files; every one is verified before use. Nothing here needs a secret.
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs /tmp/kokoro-src
+          curl -fL --retry 3 --connect-timeout 15 -o app/libs/sherpa-onnx-2.0.3.aar \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.3/sherpa-onnx-2.0.3.aar
+          echo "4c766e2e74c9d33d595338c21fe3b305c73ba45d47e96a235675c33142a2ec50  app/libs/sherpa-onnx-2.0.3.aar" | sha256sum -c -
+          curl -fL --retry 3 --connect-timeout 15 -o /tmp/kokoro-v1.0.int8.onnx \
+            https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
+          echo "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb  /tmp/kokoro-v1.0.int8.onnx" | sha256sum -c -
+          curl -fL --retry 3 --connect-timeout 15 -o /tmp/kokoro-multi-lang-v1_0.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2
+          echo "60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4  /tmp/kokoro-multi-lang-v1_0.tar.bz2" | sha256sum -c -
+          tar xjf /tmp/kokoro-multi-lang-v1_0.tar.bz2 -C /tmp/kokoro-src --exclude='*/espeak-ng-data' --exclude='*/model.onnx'
+          python3 -m pip install --quiet onnx==1.17.0
+          python3 scripts/kokoro/prepare_kokoro.py /tmp/kokoro-v1.0.int8.onnx /tmp/kokoro-src/kokoro-multi-lang-v1_0 app/src/main/assets/models/kokoro
+          ls -l app/src/main/assets/models/kokoro
       - name: Assemble debug APK
         id: assemble
         run: |

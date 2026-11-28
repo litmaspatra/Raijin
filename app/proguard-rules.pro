@@ -22,3 +22,7 @@
 
 # VO-2: JNI entry points for on-device Whisper
 -keep class com.raijin.app.audio.WhisperNative { native <methods>; }
+
+# On-device Kokoro voice: sherpa-onnx is called from native code, keep its classes.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-keep class com.raijin.app.audio.SherpaKokoroSynth { *; }
