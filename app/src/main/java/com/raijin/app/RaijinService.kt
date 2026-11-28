@@ -250,6 +250,7 @@ class RaijinService : Service() {
             },
         )
         tts = RaijinTTS(this)
+        tts.addressProvider = { com.raijin.app.prefs.UserPreferencesStore(this).addressTerm }
         webSearchClient = WebSearchClient(this)
         sttEngine = STTEngine(this, serviceScope)
 
@@ -578,8 +579,6 @@ class RaijinService : Service() {
             // normal confirmation/egress gates still apply. The raw primary is
             // preserved: pending skill answers (0a) always see it, and any
             // substitution is marked on the island and in the log.
-            val rememberRe = Regex("""^(?:remember\s+that|remember:|remember)\s+(.+)$""", RegexOption.IGNORE_CASE)
-            val recallRe = Regex("""^(?:what\s+did\s+i\s+tell\s+you\s+about|do\s+you\s+remember|what\s+is\s+my|recall)\s+(.+)$""", RegexOption.IGNORE_CASE)
             val learnRe = Regex("""^(?:learn\s+skill|create\s+skill)\s*(?:named\s+([^:]+))?:\s*when\s+i\s+say\s+([^,]+),\s*(.+)$""", RegexOption.IGNORE_CASE)
             val selection = run {
                 val manifests = runCatching { skillRunner.manifests() }.getOrDefault(emptyList())
@@ -598,8 +597,8 @@ class RaijinService : Service() {
                                     .getOrDefault(false)
                             }
                         },
-                        io.raijin.brain.IntentAlternativeResolver.Probe("remember") { rememberRe.containsMatchIn(it) },
-                        io.raijin.brain.IntentAlternativeResolver.Probe("recall") { recallRe.containsMatchIn(it) },
+                        io.raijin.brain.IntentAlternativeResolver.Probe("remember") { io.raijin.brain.MemoryRecall.extractFact(it) != null || io.raijin.brain.AddressForm.parse(it) != null },
+                        io.raijin.brain.IntentAlternativeResolver.Probe("recall") { io.raijin.brain.MemoryRecall.extractQuery(it) != null },
                         io.raijin.brain.IntentAlternativeResolver.Probe("learn_skill") { learnRe.containsMatchIn(it) },
                         io.raijin.brain.IntentAlternativeResolver.Probe("search") { isSearchQuery(it) },
                         // OB-3: "write a note …" — the user's write/right path.
@@ -673,37 +672,61 @@ class RaijinService : Service() {
                 return@launch
             }
 
-            // 2. Natural Language Memory Learning: "remember that <fact>"
-            val rememberMatch = rememberRe.find(effective)
-            if (rememberMatch != null) {
-                val fact = rememberMatch.groupValues[1].trim()
-                if (fact.isNotBlank()) {
-                    recordInteraction("remember_fact")
+            // 2a. Form of address: "call me sir always" is saved and used in every reply from now on.
+            run {
+                val remembered = io.raijin.brain.MemoryRecall.extractFact(effective)
+                val term = io.raijin.brain.AddressForm.parse(remembered ?: effective, remembered = remembered != null)
+                if (term != null) {
+                    recordInteraction("address_preference")
+                    com.raijin.app.prefs.UserPreferencesStore(this@RaijinService).addressTerm = term
                     database.memoryDao().insert(
                         MemoryFactEntity(
                             kind = "FACT",
-                            text = fact,
+                            text = (remembered ?: effective).trim(),
                             createdAt = System.currentTimeMillis(),
                         )
                     )
-                    val feedback = "Recorded to memory: $fact"
-                    _islandState.value = IslandState.Done(feedback)
-                    tts.speak("Got it, boss. I'll remember that.")
+                    val msg = io.raijin.brain.AddressForm.confirmation(term)
+                    _islandState.value = IslandState.Done(msg)
+                    tts.speak(msg)
                     delay(2500L)
                     if (_islandState.value is IslandState.Done) _islandState.value = IslandState.Idle
                     return@launch
                 }
             }
 
-            // 3. Natural Language Memory Recall: "what did I tell you about <query>", "do you remember <query>"
-            val recallMatch = recallRe.find(effective)
-            if (recallMatch != null) {
-                val query = recallMatch.groupValues[1].trim()
-                val memories = database.memoryDao().search(query, 3)
-                if (memories.isNotEmpty()) {
+            // 2. Natural Language Memory Learning: "remember that <fact>"
+            val factToRemember = io.raijin.brain.MemoryRecall.extractFact(effective)
+            if (factToRemember != null) {
+                val fact = factToRemember
+                recordInteraction("remember_fact")
+                database.memoryDao().insert(
+                    MemoryFactEntity(
+                        kind = "FACT",
+                        text = fact,
+                        createdAt = System.currentTimeMillis(),
+                    )
+                )
+                val feedback = "Recorded to memory: $fact"
+                _islandState.value = IslandState.Done(feedback)
+                tts.speak("Got it, boss. I'll remember that.")
+                delay(2500L)
+                if (_islandState.value is IslandState.Done) _islandState.value = IslandState.Idle
+                return@launch
+            }
+
+            // 3. Memory recall, answered on the phone before any cloud call: "what is my name",
+            //    "who am I", "do you remember my bike". Nothing is sent anywhere.
+            val recallQuery = io.raijin.brain.MemoryRecall.extractQuery(effective)
+            if (recallQuery != null) {
+                val keywords = io.raijin.brain.MemoryRecall.keywords(recallQuery)
+                val found = keywords.flatMap { database.memoryDao().search(it, 10) }
+                    .distinctBy { it.id }
+                    .map { it.text }
+                val best = io.raijin.brain.MemoryRecall.rank(found, keywords).firstOrNull()
+                if (best != null) {
                     recordInteraction("recall_memory")
-                    val memoryText = memories.first().text
-                    val answer = "Memory record: $memoryText"
+                    val answer = io.raijin.brain.MemoryRecall.phrase(best)
                     _islandState.value = IslandState.Done(answer)
                     tts.speak(answer)
                     delay(4000L)

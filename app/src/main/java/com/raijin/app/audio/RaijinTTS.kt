@@ -29,6 +29,11 @@ class RaijinTTS(context: Context) {
             text.any { it.code in 0x0900..0x097F }
     }
 
+    /** Owner's chosen form of address; replaces the default "boss" in everything spoken. */
+    var addressProvider: () -> String? = { null }
+
+    private fun addr(text: String) = io.raijin.brain.AddressForm.rewrite(text, addressProvider())
+
     private var tts: TextToSpeech? = null
     private var ready = false
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -61,7 +66,8 @@ class RaijinTTS(context: Context) {
 
     private val utteranceCallbacks = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
-    fun speak(text: String, onDone: ((Boolean) -> Unit)? = null) {
+    fun speak(rawText: String, onDone: ((Boolean) -> Unit)? = null) {
+        val text = addr(rawText)
         // Skip if silent/vibrate
         if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) {
             Log.d(TAG, "Ringer silent — skipping speech synthesis")
@@ -90,7 +96,8 @@ class RaijinTTS(context: Context) {
      * BR-7: queue a sentence behind whatever is already being spoken (no
      * flush), so a streamed answer is read sentence by sentence.
      */
-    fun speakQueued(text: String) {
+    fun speakQueued(rawText: String) {
+        val text = addr(rawText)
         if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
         speakWithNativeTts(text, null, flush = false)
     }

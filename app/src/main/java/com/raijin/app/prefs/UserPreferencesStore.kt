@@ -52,6 +52,14 @@ class UserPreferencesStore(context: Context) {
             kokoroPrefs().edit().putFloat("speed", clamped).apply()
         }
 
+    /** How the owner wants to be addressed ("sir"); null keeps the default. Set by "call me X always". */
+    var addressTerm: String?
+        get() = prefs.getString(KEY_ADDRESS_TERM, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value.isNullOrBlank()) prefs.edit().remove(KEY_ADDRESS_TERM).apply()
+            else prefs.edit().putString(KEY_ADDRESS_TERM, value.trim()).apply()
+        }
+
     /** Name of the chosen system TTS voice; null means "pick the best installed one". */
     var systemVoice: String?
         get() = prefs.getString(KEY_SYSTEM_VOICE, null)
@@ -141,6 +149,7 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_QUIET_END = "quiet_hours_end"
         private const val KEY_PROVIDERS = "preferred_providers"
 
+        const val KEY_ADDRESS_TERM = "address_term"
         const val DEFAULT_VOICE = "bf_emma"
         val DEFAULT_PROTECTED_PATHS = setOf(
             "/storage/emulated/0/DCIM",
