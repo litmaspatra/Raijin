@@ -60,6 +60,19 @@ class SkillSourceResolverTest {
     }
 
     @Test
+    fun `github shorthand can name a branch tag or commit`() {
+        val source = SkillSourceResolver.resolve("litmaspatra/raijin-skills@v1.2")
+        assertIs<SkillSourceResolver.SkillSource.GitHubRepo>(source)
+        assertEquals("v1.2", source.ref)
+        assertEquals("raijin-skills", source.repo)
+        assertEquals(
+            "https://raw.githubusercontent.com/litmaspatra/raijin-skills/abc/skill.json",
+            source.rawUrlAt("abc"),
+        )
+        assertIs<SkillSourceResolver.SkillSource.Invalid>(SkillSourceResolver.resolve("a/b@../x"))
+    }
+
+    @Test
     fun `github url resolves the same way`() {
         val source = SkillSourceResolver.resolve("https://github.com/litmaspatra/raijin-skills")
         assertIs<SkillSourceResolver.SkillSource.GitHubRepo>(source)

@@ -15,12 +15,23 @@ object SkillSourceResolver {
         data class HttpsUrl(val url: String, val expectedSha256: String?) : SkillSource
 
         /** GitHub repo; [rawUrl] points at the skill.json inside it. */
-        data class GitHubRepo(val owner: String, val repo: String, val path: String, val rawUrl: String) : SkillSource
+        data class GitHubRepo(
+            val owner: String,
+            val repo: String,
+            val path: String,
+            val rawUrl: String,
+            /** Branch, tag or commit the owner asked for (`owner/repo@ref`); null means the default branch. */
+            val ref: String? = null,
+        ) : SkillSource {
+            /** Raw file URL at an exact commit, so what the owner reviews is what gets installed. */
+            fun rawUrlAt(commitSha: String) = "https://raw.githubusercontent.com/$owner/$repo/$commitSha/$path"
+        }
 
         data class Invalid(val reason: String) : SkillSource
     }
 
     private val SHA = Regex("[0-9a-f]{64}")
+    private val SHORTHAND_REF = Regex("""^([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)@([A-Za-z0-9_./-]+)$""")
     private val GITHUB_RE = Regex("""^(?:https://)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$""")
 
     fun resolve(input: String): SkillSource {
@@ -32,6 +43,13 @@ object SkillSourceResolver {
         }
 
         // GitHub shorthand "owner/repo" or a github.com URL -> raw skill.json.
+        SHORTHAND_REF.matchEntire(text)?.let { m ->
+            val ref = m.groupValues[3]
+            if (ref.contains("..") || ref.startsWith("/") || ref.endsWith("/")) {
+                return SkillSource.Invalid("not a valid branch, tag or commit: $ref")
+            }
+            return githubSource(m.groupValues[1], m.groupValues[2], ref)
+        }
         val gh = GITHUB_RE.matchEntire(text)
             ?: if (text.matches(Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))) {
                 val (owner, repo) = text.split("/", limit = 2)
@@ -62,13 +80,14 @@ object SkillSourceResolver {
         return SkillSource.Invalid("not a file, https URL, or GitHub repo: $text")
     }
 
-    private fun githubSource(owner: String, repo: String): SkillSource {
+    private fun githubSource(owner: String, repo: String, ref: String? = null): SkillSource {
         val path = "skill.json"
         return SkillSource.GitHubRepo(
             owner = owner,
             repo = repo,
             path = path,
-            rawUrl = "https://raw.githubusercontent.com/$owner/$repo/HEAD/$path",
+            rawUrl = "https://raw.githubusercontent.com/$owner/$repo/${ref ?: "HEAD"}/$path",
+            ref = ref,
         )
     }
 

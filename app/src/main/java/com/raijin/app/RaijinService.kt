@@ -688,21 +688,15 @@ class RaijinService : Service() {
                 return@launch
             }
 
-            // 2a. Form of address: "call me sir always" is saved and used in every reply from now on.
+            // 2a. Voice self-edit: only the editable layer (form of address, speech speed, on-device
+            // voice, undo). Core, permissions and what leaves the phone are refused (SelfEdit policy).
             run {
                 val remembered = io.raijin.brain.MemoryRecall.extractFact(effective)
-                val term = io.raijin.brain.AddressForm.parse(remembered ?: effective, remembered = remembered != null)
-                if (term != null) {
-                    recordInteraction("address_preference")
-                    com.raijin.app.prefs.UserPreferencesStore(this@RaijinService).addressTerm = term
-                    database.memoryDao().insert(
-                        MemoryFactEntity(
-                            kind = "FACT",
-                            text = (remembered ?: effective).trim(),
-                            createdAt = System.currentTimeMillis(),
-                        )
-                    )
-                    val msg = io.raijin.brain.AddressForm.confirmation(term)
+                val cmd = io.raijin.brain.SelfEdit.parse(remembered ?: effective, remembered = remembered != null)
+                if (cmd != null) {
+                    recordInteraction("self_edit")
+                    val msg = com.raijin.app.selfedit.SelfEditExecutor(this@RaijinService, database.memoryDao())
+                        .apply(cmd, (remembered ?: effective))
                     _islandState.value = IslandState.Done(msg)
                     tts.speak(msg)
                     delay(2500L)
