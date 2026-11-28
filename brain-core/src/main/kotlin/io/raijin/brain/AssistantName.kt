@@ -9,7 +9,7 @@ object AssistantName {
     const val MAX_LEN = 20
 
     private val RENAME = Regex(
-        """^(?:please\s+)?(?:(?:from\s+now\s+on\s+)?(?:call\s+yourself|your\s+name\s+is(?:\s+now)?|rename\s+yourself\s+(?:to\s+)?|change\s+your\s+name\s+to|i(?:'ll|\s+will)\s+call\s+you|you(?:'re|\s+are)\s+(?:now\s+)?called))\s+([\p{L}][\p{L}'\-]*(?:\s+[\p{L}][\p{L}'\-]*)?)(?:\s*,?\s*(?:and\s+)?(?:(?:she|he)\s+is|you(?:'re|\s+are)\s+(?:a\s+)?|use\s+(?:a\s+)?)?(female|male|woman|man|girl|boy|she|he)(?:\s+voice)?)?$""",
+        """^(?:please\s+)?(?:(?:from\s+now\s+on\s+)?(?:call\s+yourself|your\s+name\s+is(?:\s+now)?|rename\s+yourself(?:\s+to)?|change\s+your\s+name\s+to|i(?:'ll|\s+will)\s+call\s+you|you(?:'re|\s+are)\s+(?:now\s+)?called))\s+([\p{L}][\p{L}'\-]*(?:\s+[\p{L}][\p{L}'\-]*)?)(?:\s*,?\s*(?:and\s+)?(?:(?:she|he)\s+is|you(?:'re|\s+are)\s+(?:a\s+)?|use\s+(?:a\s+)?)?(female|male|woman|man|girl|boy|she|he)(?:\s+voice)?)?$""",
         RegexOption.IGNORE_CASE,
     )
 

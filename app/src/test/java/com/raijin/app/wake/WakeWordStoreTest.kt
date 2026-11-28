@@ -35,7 +35,7 @@ class WakeWordStoreTest {
         assertEquals(null, WakeAssets.writeKeywords(dir, "Zq", 1.5f))
     }
 
-    @Test fun notAvailableWithoutBundledModel() {
-        assertFalse(WakeAssets.bundled(context))
+    @Test fun availableOnlyWithModelAndEngine() {
+        assertEquals(WakeAssets.bundled(context) && WakeAssets.engineAvailable(), WakeAssets.available(context))
     }
 }
