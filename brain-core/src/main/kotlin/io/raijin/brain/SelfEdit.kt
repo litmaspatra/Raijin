@@ -5,7 +5,7 @@ package io.raijin.brain
  * not. The boundary is a fixed allow-list, not a judgement call:
  *
  *  - EDITABLE (takes effect at once, announced, undoable): form of address, speech speed,
- *    the on-device voice (female/male). Remembered facts are handled by the memory path.
+ *    the on-device voice (female/male), the assistant's own name. Remembered facts are handled by the memory path.
  *  - LOCKED (voice can never change it): code and updates, safety/privacy/consent gates,
  *    permissions, the tool list.
  *  - ASK FIRST (never by voice alone): anything that changes what leaves the phone, the cloud
@@ -21,6 +21,8 @@ object SelfEdit {
         data class SpeedStep(val delta: Float) : Command
         data class SetSpeed(val factor: Float) : Command
         data class SetVoiceGender(val male: Boolean) : Command
+        /** [male] null: not stated, look the name up. */
+        data class SetName(val name: String, val male: Boolean?) : Command
         data object Undo : Command
         data class Refuse(val reason: Reason) : Command
     }
@@ -61,10 +63,12 @@ object SelfEdit {
     )
 
     /** [remembered] is true when [text] is the body of an explicit "remember ..." request. */
-    fun parse(text: String, remembered: Boolean = false): Command? {
+    fun parse(text: String, remembered: Boolean = false, awaitingGender: Boolean = false): Command? {
         val t = text.trim().trimEnd('.', '!', '?').trim()
         if (t.isEmpty()) return null
         if (UNDO.matches(t)) return Command.Undo
+        if (awaitingGender) AssistantName.parseGenderAnswer(t)?.let { return Command.SetVoiceGender(it) }
+        AssistantName.parseRename(t)?.let { return Command.SetName(it.name, it.male) }
         LOCKED.firstOrNull { it.containsMatchIn(t) }?.let { return Command.Refuse(Reason.CORE_LOCKED) }
         ASK_FIRST.firstOrNull { it.containsMatchIn(t) }?.let { return Command.Refuse(Reason.ASK_FIRST) }
         AddressForm.parse(text, remembered)?.let { return Command.SetAddress(it) }

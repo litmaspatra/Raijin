@@ -7,6 +7,7 @@ import com.raijin.app.memory.MemoryDao
 import com.raijin.app.memory.MemoryFactEntity
 import com.raijin.app.prefs.UserPreferencesStore
 import io.raijin.brain.AddressForm
+import io.raijin.brain.AssistantName
 import io.raijin.brain.SelfEdit
 import io.raijin.brain.SelfEditEntry
 import io.raijin.brain.SelfEditLog
@@ -27,6 +28,7 @@ class SelfEditExecutor(context: Context, private val memory: MemoryDao) {
         const val K_ADDRESS = "address"
         const val K_SPEED = "speed"
         const val K_VOICE = "voice"
+        const val K_NAME = "name"
     }
 
     /** Applies [cmd]; returns the line to speak. [sourceText] is the owner's words, kept as the remembered fact for an address change. */
@@ -44,13 +46,33 @@ class SelfEditExecutor(context: Context, private val memory: MemoryDao) {
         is SelfEdit.Command.SpeedStep -> setSpeed(SelfEdit.clampSpeed(prefs.ttsSpeed + cmd.delta), if (cmd.delta > 0) "faster" else "slower")
         is SelfEdit.Command.SetSpeed -> setSpeed(SelfEdit.clampSpeed(cmd.factor), "at ${"%.1f".format(cmd.factor)} times")
         is SelfEdit.Command.SetVoiceGender -> {
-            val voice = if (cmd.male) KokoroVoices.MALE else KokoroVoices.FEMALE
-            val cfg = kokoro.load()
-            log.push(SelfEditEntry(K_VOICE, cfg.voice, voice.id))
-            kokoro.save(cfg.copy(voice = voice.id))
-            val note = if (cfg.enabled) "" else " Turn on the on-device voice in Settings to hear it."
-            "Okay, I'll use the ${if (cmd.male) "male" else "female"} voice.$note$UNDO_HINT"
+            val pending = prefs.pendingGenderForName
+            prefs.pendingGenderForName = null
+            val msg = setVoice(cmd.male)
+            if (pending != null) "Got it, $pending is ${if (cmd.male) "male" else "female"}. $msg" else msg
         }
+        is SelfEdit.Command.SetName -> {
+            val before = prefs.assistantName
+            log.push(SelfEditEntry(K_NAME, before, cmd.name))
+            prefs.assistantName = cmd.name
+            val male = cmd.male ?: AssistantName.genderOf(cmd.name)
+            if (male == null) {
+                prefs.pendingGenderForName = cmd.name
+                "Okay, I'm ${cmd.name} now. Is ${cmd.name} a male or female name? Say male or female and I'll pick the voice.$UNDO_HINT"
+            } else {
+                prefs.pendingGenderForName = null
+                "Okay, I'm ${cmd.name} now. " + setVoice(male)
+            }
+        }
+    }
+
+    private fun setVoice(male: Boolean): String {
+        val voice = if (male) KokoroVoices.MALE else KokoroVoices.FEMALE
+        val cfg = kokoro.load()
+        log.push(SelfEditEntry(K_VOICE, cfg.voice, voice.id))
+        kokoro.save(cfg.copy(voice = voice.id))
+        val note = if (cfg.enabled) "" else " Turn on the on-device voice in Settings to hear it."
+        return "Okay, I'll use the ${if (male) "male" else "female"} voice.$note$UNDO_HINT"
     }
 
     private fun setSpeed(new: Float, words: String): String {
@@ -68,6 +90,7 @@ class SelfEditExecutor(context: Context, private val memory: MemoryDao) {
                 e.memoryText?.let { t -> memory.getAll().filter { it.text == t }.forEach { memory.deleteById(it.id) } }
             }
             K_SPEED -> e.before?.toFloatOrNull()?.let { prefs.ttsSpeed = it }
+            K_NAME -> e.before?.let { prefs.assistantName = it }
             K_VOICE -> e.before?.let { kokoro.save(kokoro.load().copy(voice = it)) }
         }
         return "Undone."

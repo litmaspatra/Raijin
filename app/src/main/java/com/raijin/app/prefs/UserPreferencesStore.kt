@@ -52,6 +52,16 @@ class UserPreferencesStore(context: Context) {
             kokoroPrefs().edit().putFloat("speed", clamped).apply()
         }
 
+    /** The assistant's own name; the wake phrase is "hey <name>". */
+    var assistantName: String
+        get() = prefs.getString(KEY_ASSISTANT_NAME, null)?.takeIf { it.isNotBlank() } ?: io.raijin.brain.AssistantName.DEFAULT
+        set(value) { prefs.edit().putString(KEY_ASSISTANT_NAME, value.trim()).apply() }
+
+    /** Set while Raijin has asked "male or female name?" and waits for the answer. */
+    var pendingGenderForName: String?
+        get() = prefs.getString(KEY_PENDING_GENDER, null)?.takeIf { it.isNotBlank() }
+        set(value) { if (value == null) prefs.edit().remove(KEY_PENDING_GENDER).apply() else prefs.edit().putString(KEY_PENDING_GENDER, value).apply() }
+
     /** How the owner wants to be addressed ("sir"); null keeps the default. Set by "call me X always". */
     var addressTerm: String?
         get() = prefs.getString(KEY_ADDRESS_TERM, null)?.takeIf { it.isNotBlank() }
@@ -158,6 +168,8 @@ class UserPreferencesStore(context: Context) {
         private const val KEY_PROVIDERS = "preferred_providers"
 
         const val KEY_ADDRESS_TERM = "address_term"
+        const val KEY_ASSISTANT_NAME = "assistant_name"
+        const val KEY_PENDING_GENDER = "pending_gender_for_name"
         const val KEY_SHARE_CLOUD_CONTEXT = "share_cloud_context"
         const val DEFAULT_VOICE = "bf_emma"
         val DEFAULT_PROTECTED_PATHS = setOf(
