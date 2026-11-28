@@ -216,6 +216,18 @@ jobs:
           python3 -m pip install --quiet onnx==1.17.0
           python3 scripts/kokoro/prepare_kokoro.py /tmp/kokoro-v1.0.int8.onnx /tmp/kokoro-src/kokoro-multi-lang-v1_0 app/src/main/assets/models/kokoro
           ls -l app/src/main/assets/models/kokoro
+      - name: Fetch wake-word model (pinned, checksum-verified, not committed)
+        # sherpa-onnx streaming zipformer keyword spotter, English (package README: Apache-2.0).
+        # Only the int8 files are bundled (about 5 MB). Free public download, no secret.
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kws-src app/src/main/assets/models/kws
+          curl -fL --retry 3 --connect-timeout 15 -o /tmp/kws.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2
+          echo "f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a  /tmp/kws.tar.bz2" | sha256sum -c -
+          tar xjf /tmp/kws.tar.bz2 -C /tmp/kws-src
+          python3 scripts/kws/prepare_kws.py /tmp/kws-src/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01 app/src/main/assets/models/kws
+          ls -l app/src/main/assets/models/kws
       - name: Assemble debug APK
         id: assemble
         run: |

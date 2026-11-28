@@ -228,6 +228,9 @@ private fun MasterSettingsAndCommandDeck(
 
     // On-device Kokoro voice state
     val kokoroStore = remember { KokoroConfigStore(context) }
+    val wakeStore = remember { com.raijin.app.wake.WakeWordStore(context) }
+    var wakeConfig by remember { mutableStateOf(wakeStore.load()) }
+    val wakeAvailable = remember { com.raijin.app.wake.WakeAssets.available(context) }
     var kokoroConfig by remember { mutableStateOf(kokoroStore.load()) }
     var kokoroTestStatus by remember { mutableStateOf<String?>(null) }
     var isTestingKokoro by remember { mutableStateOf(false) }
@@ -1009,6 +1012,18 @@ private fun MasterSettingsAndCommandDeck(
                             },
                             status = kokoroTestStatus,
                             lastProblem = kokoroTester.lastProblem,
+                        )
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Wake word ("hey <name>"), off by default
+                        com.raijin.app.ui.prefs.WakeWordCard(
+                            available = wakeAvailable,
+                            name = com.raijin.app.prefs.UserPreferencesStore(context).assistantName,
+                            enabled = wakeConfig.enabled,
+                            onEnabled = { wakeConfig = wakeConfig.copy(enabled = it).also(wakeStore::save) },
+                            onlyScreenOnOrCharging = wakeConfig.onlyScreenOnOrCharging,
+                            onOnlyScreenOnOrCharging = { wakeConfig = wakeConfig.copy(onlyScreenOnOrCharging = it).also(wakeStore::save) },
                         )
 
                         Spacer(Modifier.height(16.dp))

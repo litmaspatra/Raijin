@@ -106,6 +106,7 @@ android {
     if (!file("libs/sherpa-onnx-2.0.3.aar").exists()) {
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
             exclude("**/SherpaKokoroSynth.kt")
+            exclude("**/SherpaKeywordEngine.kt")
         }
     }
 

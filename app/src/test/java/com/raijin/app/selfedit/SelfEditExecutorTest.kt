@@ -89,4 +89,26 @@ class SelfEditExecutorTest {
         assertEquals(1.0f, prefs.ttsSpeed, 0.001f)
         assertEquals("There is nothing to undo.", run("undo"))
     }
+
+    @Test fun renameKnownNamePicksVoiceAndUndoRestoresName() {
+        val prefs = UserPreferencesStore(context)
+        val msg = run("call yourself Eva")
+        assertEquals("Eva", prefs.assistantName)
+        assertEquals("af_heart", KokoroConfigStore(context).load().voice)
+        assertTrue(msg.contains("female voice"))
+        run("call yourself George")
+        assertEquals("bm_george", KokoroConfigStore(context).load().voice)
+    }
+
+    @Test fun renameUnknownNameAsksThenAppliesAnswer() {
+        val prefs = UserPreferencesStore(context)
+        val q = run("call yourself Zyxel")
+        assertTrue(q.contains("male or female"))
+        assertEquals("Zyxel", prefs.pendingGenderForName)
+        val cmd = SelfEdit.parse("male", awaitingGender = true)!!
+        val msg = runBlocking { exec.apply(cmd, "male") }
+        assertTrue(msg.contains("male voice"))
+        assertNull(prefs.pendingGenderForName)
+        assertEquals("bm_george", KokoroConfigStore(context).load().voice)
+    }
 }

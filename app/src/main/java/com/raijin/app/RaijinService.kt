@@ -438,13 +438,25 @@ class RaijinService : Service() {
                 // MainActivity start path (no action): app is foreground, so this
                 // is the safe point to promote a boot-fallback service to mic type.
                 promoteMicFgsTypeIfEligible()
+                // Wake word ("hey <name>"): idle unless the owner turned it on in Settings.
+                if (wakeListener == null) {
+                    wakeListener = com.raijin.app.wake.WakeWordListener(
+                        this,
+                        isBusy = { _islandState.value !is IslandState.Idle },
+                        onWake = { startVoiceCapture() },
+                    )
+                }
+                wakeListener?.start()
             }
         }
         return START_STICKY
     }
 
+    private var wakeListener: com.raijin.app.wake.WakeWordListener? = null
+
     override fun onDestroy() {
         super.onDestroy()
+        wakeListener?.stop()
         Log.i(TAG, "onDestroy")
         morningReceiver?.let {
             try { unregisterReceiver(it) } catch (_: Exception) {}
@@ -692,7 +704,8 @@ class RaijinService : Service() {
             // voice, undo). Core, permissions and what leaves the phone are refused (SelfEdit policy).
             run {
                 val remembered = io.raijin.brain.MemoryRecall.extractFact(effective)
-                val cmd = io.raijin.brain.SelfEdit.parse(remembered ?: effective, remembered = remembered != null)
+                val awaiting = com.raijin.app.prefs.UserPreferencesStore(this@RaijinService).pendingGenderForName != null
+                val cmd = io.raijin.brain.SelfEdit.parse(remembered ?: effective, remembered = remembered != null, awaitingGender = awaiting)
                 if (cmd != null) {
                     recordInteraction("self_edit")
                     val msg = com.raijin.app.selfedit.SelfEditExecutor(this@RaijinService, database.memoryDao())
