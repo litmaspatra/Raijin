@@ -891,7 +891,11 @@ class AndroidActuator(
         val hit = hits?.let { com.raijin.app.media.YouTubeLookup.pick(it, preferSong) } ?: return null
         val pkg = if (musicApp) "com.google.android.apps.youtube.music" else "com.google.android.youtube"
         val uri = Uri.parse(if (musicApp) hit.musicWatchUrl else hit.watchUrl)
-        val result = openUriInApp(uri, pkg) ?: openUriInApp(uri, null) ?: return null
+        val result = if (musicApp) {
+            openUriInApp(uri, pkg) ?: openUriInApp(uri, null) ?: return null
+        } else {
+            openVideoUri(uri) ?: return null
+        }
         Log.i(TAG, "Lookup opened a watch link in ${if (musicApp) "YT Music" else "YouTube"}")
         return ActionResult.EXECUTED(hit.spoken)
     }
@@ -907,9 +911,38 @@ class AndroidActuator(
         null
     }
 
+    /**
+     * Opens a video link in the regular YouTube app. Resolves the real handlers of the
+     * link and excludes YouTube Music (which can claim watch links), then launches the
+     * chosen activity explicitly. Never falls back to an unpackaged intent, because that
+     * is what let YouTube Music grab the link.
+     */
     private fun openYouTube(uri: Uri): ActionResult =
-        openUriInApp(uri, "com.google.android.youtube") ?: openUriInApp(uri, null)
-            ?: ActionResult.FAILED("I couldn't open YouTube.")
+        openVideoUri(uri) ?: ActionResult.FAILED("I couldn't open the YouTube app.")
+
+    private fun openVideoUri(uri: Uri): ActionResult? = try {
+        val probe = Intent(Intent.ACTION_VIEW, uri)
+        val handlers = context.packageManager
+            .queryIntentActivities(probe, PackageManager.MATCH_ALL)
+            .mapNotNull { r ->
+                r.activityInfo?.let { com.raijin.app.media.VideoAppChooser.Candidate(it.packageName, it.name) }
+            }
+        val chosen = com.raijin.app.media.VideoAppChooser.pick(handlers)
+        if (chosen == null) {
+            null
+        } else {
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setClassName(chosen.pkg, chosen.activity)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Log.i(TAG, "Video opened in ${chosen.pkg}")
+            ActionResult.EXECUTED()
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "Video open failed: ${e.javaClass.simpleName}")
+        null
+    }
 
     // ── Storage Management ────────────────────────────────────────────────────
 
