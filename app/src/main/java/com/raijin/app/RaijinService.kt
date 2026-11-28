@@ -748,6 +748,14 @@ class RaijinService : Service() {
                 return@launch
             }
 
+            // 4z. Obsidian: "what is inside my folder" is answered on the phone from the
+            //     selected vault, before the web-research reflex can take "what is ...".
+            if (io.raijin.brain.VaultQueryParser.matches(effective)) {
+                recordInteraction("obsidian_query")
+                handleVaultQuery(traceId)
+                return@launch
+            }
+
             // 5. Direct Web Research reflex: "search for...", "who is...", "what is..."
             if (isSearchQuery(effective)) {
                 recordInteraction("web_search")
@@ -767,6 +775,19 @@ class RaijinService : Service() {
             io.raijin.brain.NoteTriggerParser.extract(effective)?.let { req ->
                 recordInteraction("obsidian_note")
                 handleNoteRequest(req, selection?.primary ?: trimmed, traceId)
+                return@launch
+            }
+            if (io.raijin.brain.NoteTriggerParser.isBare(effective)) {
+                recordInteraction("obsidian_note")
+                val said = try {
+                    askOwnerForSkill("What should the note say?", traceId, "Use this")
+                } catch (e: com.raijin.app.skill.SkillAskBridge.AskCancelledException) { null }
+                if (said.isNullOrBlank()) {
+                    _islandState.value = IslandState.Done("No note")
+                    tts.speak("Okay, no note.")
+                    return@launch
+                }
+                handleNoteRequest(io.raijin.brain.NoteTriggerParser.NoteRequest(said.trim()), said.trim(), traceId)
                 return@launch
             }
 
@@ -968,6 +989,29 @@ class RaijinService : Service() {
     }
 
     // ── OB-3: Obsidian note flow ────────────────────────────────────────────
+
+    /** Read-only, on-phone answer to "what is inside my Obsidian folder". Nothing is sent anywhere. */
+    private suspend fun handleVaultQuery(traceId: String) {
+        val fs = com.raijin.app.obsidian.ObsidianVaultStore(this).openFs()
+        if (fs == null) {
+            val msg = "Pick your vault folder in Raijin settings first, boss."
+            _islandState.value = IslandState.Failed(msg)
+            tts.speak(msg)
+            return
+        }
+        val summary = try {
+            val index = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.raijin.app.obsidian.VaultIndex.scan(fs)
+            }
+            io.raijin.brain.VaultQueryParser.summarize(index.folders, index.notes.keys.toList())
+        } catch (e: Exception) {
+            "I could not read the vault folder: ${e.javaClass.simpleName}."
+        }
+        _islandState.value = IslandState.Done(summary)
+        tts.speak(summary)
+        delay(6000L)
+        if (_islandState.value is IslandState.Done) _islandState.value = IslandState.Idle
+    }
 
     /**
      * "write a note …" — mirror of the SK-3 consent pattern:
