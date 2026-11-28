@@ -63,7 +63,7 @@ class EnergyEndpointerFloorTest {
         val ep = EnergyEndpointer()
         val quiet = ShortArray(480) { 100 }
         val loud = ShortArray(480) { 3000 }
-        ep.feedN(quiet, 8)
+        repeat(8) { ep.feed(quiet) }
         ep.feed(loud)
         assertEquals(9 * 30, ep.heardMs)
         assertEquals(3000.0, ep.peakRms, 1.0)
